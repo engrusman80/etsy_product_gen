@@ -24,6 +24,7 @@ import {
   Share2,
   Facebook,
   Palette,
+  Upload,
 } from "lucide-react";
 import { normalizeSocial, pinterestShareUrl, facebookShareUrl } from "@/lib/social";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -195,6 +196,8 @@ type Settings = {
   geminiKey: string;
   openrouterKey: string;
   removeBgKey: string;
+  /** "4k": native 4K pro image; "fast": cheaper ~1K flash image upscaled to 4096px. */
+  imageQuality: "4k" | "fast";
 };
 type Shop = {
   shopName: string;
@@ -213,11 +216,21 @@ const DEFAULT_SETTINGS: Settings = {
   geminiKey: "",
   openrouterKey: "",
   removeBgKey: "",
+  imageQuality: "4k",
 };
 /**
  * The Default AI gateway only has a key when the app runs on Lovable hosting. When the user
  * kept it selected but entered a key for another provider, use that provider instead.
  */
+/** True when the user entered a key for the provider that will be used. */
+function hasAiKey(s: Settings): boolean {
+  const p = activeProvider(s);
+  if (p === "gemini") return !!s.geminiKey;
+  if (p === "openai") return !!s.openaiKey;
+  if (p === "openrouter") return !!s.openrouterKey;
+  return !!s.lovableKey;
+}
+
 function activeProvider(s: Settings): AIProvider {
   if (s.aiProvider !== "lovable" || s.lovableKey) return s.aiProvider;
   if (s.geminiKey) return "gemini";
@@ -843,6 +856,7 @@ function Index() {
   /** Warn (without failing) when the provider could not return a native 4K design. */
   async function checkNative4k(design: string) {
     const { width, height } = await imageSize(design).catch(() => ({ width: 0, height: 0 }));
+    if (settings.imageQuality === "fast") return;
     if (width && Math.max(width, height) < 4096) {
       toast.warning(
         `Artwork came back at ${width}×${height}px, not native 4K. Files are upscaled to 4096px; for true 4K use Google Gemini, OpenRouter or Default AI (OpenAI tops out at 1536px).`,
@@ -881,7 +895,7 @@ function Index() {
     onStage?.("Generating artwork…");
     const imgRes = await apiWithRetry<{ image: string }>(
       "/api/generate-design",
-      { prompt: variationPrompt, productType: typeId },
+      { prompt: variationPrompt, productType: typeId, fast: settings.imageQuality === "fast" },
       2,
     );
     void checkNative4k(imgRes.image);
@@ -917,6 +931,125 @@ function Index() {
     };
   }
 
+  /**
+   * Use artwork the seller already has (e.g. made in the free Gemini app or Canva). Cut-out,
+   * vector trace and print files run in the browser, so this works without an AI key; SEO and
+   * mockups are added only when a key is set.
+   */
+  async function startFromUpload(file: File) {
+    const name =
+      parseKeywords(idea)[0] ||
+      file.name
+        .replace(/\.[^.]+$/, "")
+        .replace(/[-_]+/g, " ")
+        .trim() ||
+      "My design";
+    const withKey = hasAiKey(settings);
+    const toGen = withKey ? allMockups.filter((m) => selectedMockups.has(m.id)) : [];
+    if (withKey) {
+      const ok = await confirmCost({
+        provider: activeProvider(settings),
+        products: 1,
+        variations: 1,
+        mockupsPerVariation: toGen.length,
+        useRemoveBgApi: Boolean(settings.removeBgKey),
+        uploaded: true,
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    setErr(null);
+    setSeo(null);
+    setRawImage(null);
+    setTransparentImage(null);
+    setMockups([]);
+    setBatch(null);
+    setProgress(5);
+    if (video) URL.revokeObjectURL(video.url);
+    setVideo(null);
+    setResultType(productType.id);
+    try {
+      setStep("Reading your artwork…");
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      // Normalise any JPG/WebP upload to PNG so every later step sees the same format.
+      const design = await reencodeB64(dataUrl.replace(/^data:[^,]+,/, ""), {
+        type: "image/png",
+      });
+      const { width, height } = await imageSize(design);
+      if (Math.max(width, height) < 2048) {
+        toast.warning(
+          `Your image is ${width}×${height}px. Files are upscaled to 4096px; upload a larger image for the sharpest prints.`,
+          { duration: 8000 },
+        );
+      }
+      setRawImage(design);
+      setProgress(25);
+
+      setStep(
+        productType.background === "transparent" ? "Removing background…" : "Preparing files…",
+      );
+      const transparent = await prepareArt(design, productType.id);
+      setTransparentImage(transparent);
+      setProgress(50);
+
+      const placeholderSeo: SEO = { title: name, description: "", tags: [] };
+      if (withKey) {
+        setStep("Writing Etsy SEO listing…");
+        try {
+          setSeo(
+            await api<SEO>("/api/generate-seo", {
+              idea: name,
+              shop,
+              productType: productType.id,
+            }),
+          );
+        } catch (e) {
+          console.warn("SEO failed for uploaded design", e);
+          setSeo(placeholderSeo);
+        }
+      } else {
+        setSeo(placeholderSeo);
+      }
+      setProgress(60);
+
+      const done: Mockup[] = [];
+      const src = toGen.length ? await mockupInput(transparent) : "";
+      for (let i = 0; i < toGen.length; i++) {
+        const m = toGen[i];
+        setStep(`Mockup ${i + 1}/${toGen.length}: ${m.label}…`);
+        try {
+          const body: Record<string, unknown> = {
+            image: src,
+            mockup: m.id,
+            formats: productType.formats,
+          };
+          if (m.id.startsWith("custom:")) body.customPrompt = m.label;
+          const r = await apiWithRetry<{ image: string }>("/api/generate-mockup", body, 2);
+          done.push({ id: m.id, label: m.label, image: r.image });
+        } catch (e) {
+          console.error("mockup failed", m.id, e);
+        }
+        setMockups([...done]);
+        setProgress(60 + Math.round(((i + 1) / toGen.length) * 40));
+      }
+      setProgress(100);
+      setStep(
+        withKey
+          ? "Done!"
+          : "Done! Files are ready. Add an AI key in Settings for SEO copy and mockups.",
+      );
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function generate() {
     if (!idea.trim()) return;
     const keywords = parseKeywords(idea);
@@ -931,6 +1064,7 @@ function Index() {
       variations: vCount,
       mockupsPerVariation: mockupsCount,
       useRemoveBgApi: Boolean(settings.removeBgKey),
+      fastImage: settings.imageQuality === "fast",
     });
     if (!ok) return;
 
@@ -961,7 +1095,11 @@ function Index() {
         setStep("Generating product artwork…");
         const imgRes = await apiWithRetry<{ image: string }>(
           "/api/generate-design",
-          { prompt: keywords[0], productType: productType.id },
+          {
+            prompt: keywords[0],
+            productType: productType.id,
+            fast: settings.imageQuality === "fast",
+          },
           2,
         );
         setRawImage(imgRes.image);
@@ -1337,7 +1475,8 @@ function Index() {
                             >
                               aistudio.google.com/apikey
                             </a>{" "}
-                            — 1,500 free requests/day.
+                            . Free for SEO and pattern text; image generation needs billing on the
+                            key.
                           </>
                         )}
                         {draftSettings.aiProvider === "openai" && (
@@ -1374,6 +1513,32 @@ function Index() {
                             Gemini, OpenAI, or OpenRouter.
                           </>
                         )}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="iq">Image quality</Label>
+                      <select
+                        id="iq"
+                        className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={draftSettings.imageQuality}
+                        onChange={(e) =>
+                          setDraftSettings({
+                            ...draftSettings,
+                            imageQuality: e.target.value as Settings["imageQuality"],
+                          })
+                        }
+                      >
+                        <option value="4k">
+                          Native 4K (best for prints, about $0.24 per design)
+                        </option>
+                        <option value="fast">
+                          Fast and cheap (~1K upscaled to 4K, about $0.04)
+                        </option>
+                      </select>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Fast mode is fine for stickers, wallpapers and testing ideas. Use native 4K
+                        for wall art and large prints. OpenAI has one quality level.
                       </p>
                     </div>
 
@@ -1957,6 +2122,31 @@ function Index() {
                         </>
                       )}
                     </Button>
+                    <div className="rounded-xl border border-dashed border-border bg-paper/60 p-4">
+                      <p className="text-sm font-medium">Already have the artwork?</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Upload a design you made yourself (for example in the free Gemini app or
+                        Canva). The {productType.label.toLowerCase()} files (PNG, JPG, PDF
+                        {productType.vector ? ", SVG, DXF" : ""}) are made in your browser with no
+                        AI key. With a key you also get SEO copy and mockups.
+                      </p>
+                      <label
+                        className={`mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted ${busy ? "pointer-events-none opacity-50" : ""}`}
+                      >
+                        <Upload className="h-4 w-4" /> Upload my design
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="sr-only"
+                          disabled={busy}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = "";
+                            if (f) void startFromUpload(f);
+                          }}
+                        />
+                      </label>
+                    </div>
                     {busy && (
                       <div className="space-y-2">
                         <Progress value={progress} />

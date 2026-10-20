@@ -51,7 +51,7 @@ const GEMINI: ProviderCost = {
   label: "Google Gemini",
   usd: { text: 0.0001, image: 0.24, mockup: 0.039, removebg: 0 },
   freeNote:
-    "Free tier: 1,500 text + ~100 image requests/day on AI Studio keys. Estimates assume paid tier.",
+    "AI Studio keys are free for text (SEO, patterns). Image models need billing enabled on the key.",
   billingUrl: "https://aistudio.google.com/apikey",
   models: {
     text: "gemini-2.5-flash",
@@ -92,6 +92,10 @@ export type EstimateInput = {
   mockupsPerVariation: number;
   /** Whether remove.bg API will be called (vs local skip). */
   useRemoveBgApi: boolean;
+  /** Cheaper ~1K flash image instead of native 4K pro image. */
+  fastImage?: boolean;
+  /** The user uploaded their own artwork, so no design is generated. */
+  uploaded?: boolean;
 };
 
 export type LineItem = {
@@ -120,9 +124,10 @@ export function estimateRun(input: EstimateInput): Estimate {
   const p = PROVIDERS[provider];
 
   const seoCalls = products; // 1 SEO per product (shared across variations)
-  const imageCalls = products * variations; // 1 design per variation
-  const mockupCalls = products * variations * mockupsPerVariation;
-  const bgCalls = useRemoveBgApi ? imageCalls : 0;
+  const variationCount = products * variations;
+  const imageCalls = input.uploaded ? 0 : variationCount; // 1 design per variation
+  const mockupCalls = variationCount * mockupsPerVariation;
+  const bgCalls = useRemoveBgApi ? variationCount : 0;
 
   const items: LineItem[] = [];
 
@@ -148,7 +153,15 @@ export function estimateRun(input: EstimateInput): Estimate {
   };
 
   addLine("SEO listing (title, description, tags)", seoCalls, "text");
-  addLine("Product artwork", imageCalls, "image");
+  // OpenAI has one image tier; the fast mode only changes the Gemini-based providers.
+  const fast = input.fastImage && provider !== "openai";
+  addLine(
+    fast ? "Product artwork (fast, ~1K)" : "Product artwork",
+    imageCalls,
+    "image",
+    fast ? p.models.mockup : undefined,
+    fast ? p.usd.mockup : undefined,
+  );
   addLine("Mockup composition", mockupCalls, "mockup");
   if (bgCalls > 0) {
     items.push({

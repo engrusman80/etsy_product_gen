@@ -15,9 +15,11 @@ export const Route = createFileRoute("/api/generate-design")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { prompt, productType } = (await request.json()) as {
+          const { prompt, productType, fast } = (await request.json()) as {
             prompt: string;
             productType?: string;
+            /** Cheaper flash image (~1K) instead of native 4K pro image. */
+            fast?: boolean;
           };
           if (!prompt) return Response.json({ error: "Missing prompt" }, { status: 400 });
 
@@ -49,8 +51,8 @@ Original artwork only: no trademarks, brands, or copyrighted characters.`;
             key,
             prompt: fullPrompt,
             aspectRatio: type.aspectRatio,
-            hires: true,
-            imageSize: "4K",
+            hires: !fast,
+            imageSize: fast ? undefined : "4K",
           });
           return Response.json({ image: b64 });
         } catch (e) {
