@@ -1,41 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { IP_RULES, findProtectedTerm, hasProfanity } from "@/lib/ip-guard";
 import { getProductType } from "@/lib/product-types";
 
-const BLOCKED = [
-  "disney",
-  "marvel",
-  "pokemon",
-  "pokémon",
-  "nintendo",
-  "star wars",
-  "harry potter",
-  "nike",
-  "adidas",
-  "gucci",
-  "louis vuitton",
-  "chanel",
-  "prada",
-  "supreme",
-  "coca cola",
-  "pepsi",
-  "apple inc",
-  "mickey mouse",
-  "minnie mouse",
-  "batman",
-  "superman",
-  "spider-man",
-  "spiderman",
-  "taylor swift",
-  "beyonce",
-  "drake",
-];
-
-function checkIP(text: string): string | null {
-  const lower = text.toLowerCase();
-  for (const term of BLOCKED) if (lower.includes(term)) return term;
-  return null;
-}
+const checkIP = findProtectedTerm;
 
 type Shop = {
   shopName?: string;
@@ -91,7 +59,7 @@ type SeoData = {
   keywords: string[];
 };
 
-function buildDescription(d: SeoData, shop: Shop): string {
+function buildDescription(d: SeoData, shop: Shop, crochet = false): string {
   const year = new Date().getFullYear();
   const shopName = (shop.shopName || "Our Shop").trim();
   const L: string[] = [];
@@ -112,8 +80,10 @@ function buildDescription(d: SeoData, shop: Shop): string {
   L.push("");
   for (const s of d.howItWorks) L.push(` ${s}`);
   L.push("");
-  L.push("💡 You can also use it digitally on iPad or tablet (GoodNotes / Notability supported)");
-  L.push("");
+  if (!crochet) {
+    L.push("💡 You can also use it digitally on iPad or tablet (GoodNotes / Notability supported)");
+    L.push("");
+  }
   L.push("🎯 Perfect For");
   L.push("");
   for (const p of d.perfectFor) L.push(` ${p}`);
@@ -125,6 +95,14 @@ function buildDescription(d: SeoData, shop: Shop): string {
   L.push("⚠️ Important Notes");
   L.push("");
   for (const n of d.notes) L.push(` ${n}`);
+  // Etsy's creativity standards: say what the buyer gets and how it was made.
+  if (crochet) {
+    L.push(" 🧶 This listing is a PDF crochet PATTERN (digital download), not a finished item.");
+    L.push(
+      " 📷 Product photos are digital renders of the finished design; your result may vary with yarn and hook.",
+    );
+  }
+  L.push(` 🤖 Designed by ${(shop.shopName || "our shop").trim()} with the help of AI tools.`);
   L.push("");
   L.push("🔍 SEO Keywords (for Etsy tags inspiration)");
   L.push("");
@@ -155,6 +133,12 @@ function buildDescription(d: SeoData, shop: Shop): string {
   return L.join("\n");
 }
 
+/** Drops any title phrase that names a protected brand, then trims to Etsy's 140 chars. */
+function titleOf(raw: string): string {
+  const parts = raw.split(/\s*[,|]\s*/).filter((p) => p && !checkIP(p));
+  return parts.join(", ").slice(0, 140);
+}
+
 export const Route = createFileRoute("/api/generate-seo")({
   server: {
     handlers: {
@@ -164,9 +148,16 @@ export const Route = createFileRoute("/api/generate-seo")({
             idea: string;
             shop?: Shop;
             productType?: string;
+            listingKind?: "crochet-pattern";
           };
           const { idea, shop = {} } = body;
-          const type = getProductType(body.productType);
+          const crochet = body.listingKind === "crochet-pattern";
+          const type = body.productType ? getProductType(body.productType) : null;
+          const typeLine = crochet
+            ? "Product type: Crochet pattern PDF\nThe buyer receives: an instant-download PDF crochet pattern (written rounds with stitch counts, abbreviations, materials, assembly and photos). Not a finished item, no yarn included.\n"
+            : type
+              ? `Product type: ${type.label}\nThe buyer receives: ${type.receives}.\n`
+              : "";
           if (!idea || idea.trim().length < 3) {
             return Response.json({ error: "Please describe your product idea." }, { status: 400 });
           }
@@ -203,7 +194,14 @@ Return ONLY valid JSON of this exact shape:
   "keywords": string[],       // 8-12 SEO keyword phrases for inspiration, lowercase, comma-free.
   "tags": string[]            // EXACTLY 13 Etsy tags, each <=20 chars, lowercase, multi-word preferred, no commas inside a tag, no duplicates, no trademarks.
 }
-Do not include social links or copyright — the caller appends those. No HTML.`;
+Do not include social links or copyright — the caller appends those. No HTML.
+
+Etsy policy rules (listings that break these get removed):
+- ${IP_RULES} This applies to the title, tags, keywords and text.
+- Describe only what the buyer really receives. A digital download must never be called handmade, a finished item, or shipped.
+- No claims you cannot prove: no "best seller", "#1", "guaranteed", medical or safety claims (for toys say "add safety eyes for children over 3, or embroider eyes for babies").
+- If the idea has swear words, keep them out of the title and tags (write "funny sarcastic" or "adult humor" instead).
+- Use the buyer's search words (item, style, occasion, recipient), not shop jargon. No keyword stuffing or repeated words in the title.`;
 
           let content: string;
           try {
@@ -211,7 +209,7 @@ Do not include social links or copyright — the caller appends those. No HTML.`
               provider,
               key,
               system,
-              user: `Product idea: ${idea}\nProduct type: ${type.label}\nThe buyer receives: ${type.receives}.\nWrite the title, tags and "receive" list for this product type.`,
+              user: `Product idea: ${idea}\n${typeLine}Write the title, tags and "receive" list for this product.`,
               json: true,
             });
           } catch (e) {
@@ -238,7 +236,8 @@ Do not include social links or copyright — the caller appends those. No HTML.`
             .map((t: string) =>
               String(t).toLowerCase().trim().replace(/,/g, " ").replace(/\s+/g, " "),
             )
-            .filter((t: string) => t.length > 0 && t.length <= 20)
+            .filter((t: string) => t.length > 0 && t.length <= 20 && !checkIP(t))
+            .filter((t: string, i: number, a: string[]) => a.indexOf(t) === i)
             .slice(0, 13);
 
           const arr = (v: unknown): string[] =>
@@ -253,14 +252,16 @@ Do not include social links or copyright — the caller appends those. No HTML.`
             perfectFor: arr(parsed.perfectFor),
             whyLove: arr(parsed.whyLove),
             notes: arr(parsed.notes),
-            keywords: arr(parsed.keywords),
+            keywords: arr(parsed.keywords).filter((k) => !checkIP(k)),
           };
-          const description = buildDescription(data, shop);
+          const description = buildDescription(data, shop, crochet);
 
           return Response.json({
-            title: String(parsed.title ?? "").slice(0, 140),
+            title: titleOf(String(parsed.title ?? "")),
             description,
             tags: cleanTags,
+            // Etsy wants profanity marked as mature content in the listing.
+            mature: hasProfanity(idea),
           });
         } catch (e) {
           return Response.json({ error: (e as Error).message }, { status: 500 });

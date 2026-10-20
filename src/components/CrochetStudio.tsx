@@ -144,6 +144,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
   const [mockups, setMockups] = useState<MockupOut[]>([]);
   const [seo, setSeo] = useState<SEO | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
+  const [countWarnings, setCountWarnings] = useState<string[]>([]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [zipUrl, setZipUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -195,6 +196,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
     setMockups([]);
     setSeo(null);
     setDupWarning(null);
+    setCountWarnings([]);
     if (pdfUrl) {
       URL.revokeObjectURL(pdfUrl);
       setPdfUrl(null);
@@ -209,12 +211,16 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
       const gen = async (seedSuffix = "") => {
         setStep("Designing an original pattern…");
         const seed = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}${seedSuffix}`;
-        const r = await apiCall<{ pattern: CrochetPattern }>("/api/crochet-pattern", {
-          idea,
-          seed,
-          terminology,
-          avoidTitles: historyRef.titles.slice(-30),
-        });
+        const r = await apiCall<{ pattern: CrochetPattern; warnings?: string[] }>(
+          "/api/crochet-pattern",
+          {
+            idea,
+            seed,
+            terminology,
+            avoidTitles: historyRef.titles.slice(-30),
+          },
+        );
+        setCountWarnings(r.warnings ?? []);
         return r.pattern;
       };
       let p = await gen();
@@ -253,6 +259,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
         const seoBody = {
           idea: `Crochet PATTERN PDF (digital download) — ${p.title}. ${p.subtitle}. Skill: ${p.skillLevel}. ${terminology} terminology. Finished size: ${p.finishedSize}. Includes materials list, abbreviations, row-by-row instructions, stitch chart, finishing & care.`,
           shop: shop ?? {},
+          listingKind: "crochet-pattern",
         };
         const s = await apiCall<SEO>("/api/generate-seo", seoBody);
         setSeo(s);
@@ -267,10 +274,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
           try {
             const tweak =
               m.id === "crochet-cover"
-                ? `Product name to render on the right panel: "${p.title}". Feature bullets: "${Math.max(
-                    15,
-                    (p.sections?.length ?? 6) * 3,
-                  )} page guide", "Step-by-step instructions", "${p.skillLevel} friendly". Use elegant serif italic for the product name.`
+                ? `Product name to render on the right panel: "${p.title}". Feature bullets: "PDF pattern, instant download", "Stitch counts on every round", "${p.skillLevel} friendly". Use elegant serif italic for the product name.`
                 : "";
             const r = await apiCall<{ image: string }>("/api/generate-mockup", {
               image: heroB64,
@@ -641,6 +645,44 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
           <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
             <div>{dupWarning}</div>
+          </div>
+        )}
+        {pattern && countWarnings.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <div>
+              <p className="font-medium">
+                Check these rounds before listing ({countWarnings.length}), or generate again:
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {countWarnings.slice(0, 8).map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+        {pattern && (
+          <div className="rounded-md border border-border/60 bg-muted/40 p-3 text-sm">
+            <p className="font-medium">Before you list on Etsy</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+              <li>
+                Crochet a test sample first. A photo of your real finished piece sells best and
+                proves the pattern works.
+              </li>
+              <li>
+                The AI photos are renders: keep the note in the description saying so, and add your
+                own photo as the first image when you can.
+              </li>
+              <li>
+                In the listing, set “Who made it” to “I did” (you designed the pattern) and leave
+                the AI disclosure line in the description.
+              </li>
+              <li>
+                Don&apos;t add brand, character or celebrity names to the title or tags, even in a
+                tag like “inspired by”.
+              </li>
+            </ul>
           </div>
         )}
 

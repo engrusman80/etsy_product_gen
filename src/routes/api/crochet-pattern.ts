@@ -1,34 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { IP_RULES, findProtectedTerm } from "@/lib/ip-guard";
+import { checkStitchCounts } from "@/lib/crochet/validate";
+import type { CrochetSection } from "@/lib/crochet/types";
 
-const BLOCKED = [
-  "disney",
-  "marvel",
-  "pokemon",
-  "pokémon",
-  "nintendo",
-  "star wars",
-  "harry potter",
-  "hello kitty",
-  "sanrio",
-  "minion",
-  "shrek",
-  "frozen",
-  "elsa",
-  "mickey mouse",
-  "spider-man",
-  "spiderman",
-  "batman",
-  "superman",
-  "pikachu",
-  "mario",
-];
-
-function checkIP(text: string): string | null {
-  const lower = text.toLowerCase();
-  for (const term of BLOCKED) if (lower.includes(term)) return term;
-  return null;
-}
+const checkIP = findProtectedTerm;
 
 export const Route = createFileRoute("/api/crochet-pattern")({
   server: {
@@ -113,7 +89,10 @@ Quality rules:
 - Every row MUST end with the stitch count in parentheses, e.g. "(24)".
 - Increases and decreases must add up correctly across rounds.
 - Do NOT plagiarize existing published patterns. Invent an original construction and shaping approach.
-- Do NOT reference any brand, celebrity, or copyrighted character.
+- Before answering, recount every round: stitches worked must equal the previous round's count, and the count in parentheses must equal the stitches made. Write repeats as "(sc 2, inc) × 6" and plain rounds as "sc around".
+- ${IP_RULES}
+- Etsy policy: this is a digital PATTERN designed by the seller. Never call it a finished or handmade item, and make no safety or medical claims. For toys, note safety eyes are for ages 3+ and embroidered eyes for babies.
+- Sellable on Etsy: a clear, giftable or useful finished piece with a strong silhouette that photographs well, made from commonly available yarn, with sizes or color variations where it makes sense.
 - Make the pattern COMPLETE — a buyer should be able to finish the project using only this JSON.${avoidClause}`;
 
           const user = `Design a complete original crochet pattern for: "${idea}".
@@ -144,7 +123,45 @@ Make it distinctly different from typical stock crochet patterns for this subjec
             );
           }
 
-          return Response.json({ pattern: { ...parsed, seed } });
+          // Rows that don't add up are the top reason for bad pattern reviews, so ask the model
+          // to fix the reported rounds once and keep whichever version has fewer problems.
+          let warnings = checkStitchCounts(parsed as { sections: CrochetSection[] });
+          if (warnings.length && Array.isArray(parsed.sections)) {
+            try {
+              const fixed = await callText({
+                provider,
+                key,
+                system:
+                  'You correct crochet pattern stitch counts. Return ONLY JSON { "sections": [...] } with the same sections, names and shape, fixing every listed problem so each round works exactly the previous round\'s stitches and ends with the correct "(N)" count. Keep the design and size the same.',
+                user: `Problems:\n${warnings.slice(0, 30).join("\n")}\n\nSections:\n${JSON.stringify(parsed.sections)}`,
+                json: true,
+                tier: "pro",
+                maxTokens: 12000,
+              });
+              const sections = (
+                JSON.parse(
+                  fixed
+                    .trim()
+                    .replace(/^```(?:json)?\s*/i, "")
+                    .replace(/```$/i, "")
+                    .trim(),
+                ) as { sections?: CrochetSection[] }
+              ).sections;
+              if (Array.isArray(sections) && sections.length) {
+                const after = checkStitchCounts({ sections });
+                if (after.length < warnings.length) {
+                  parsed.sections = sections;
+                  warnings = after;
+                }
+              }
+            } catch {
+              /* keep the first version and show its warnings */
+            }
+          }
+          const title = String(parsed.title ?? "");
+          if (checkIP(title)) parsed.title = idea.slice(0, 100);
+
+          return Response.json({ pattern: { ...parsed, seed }, warnings });
         } catch (e) {
           const status = statusFromError(e);
           return Response.json({ error: (e as Error).message }, { status });

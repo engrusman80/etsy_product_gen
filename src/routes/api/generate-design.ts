@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveProvider, callImage, statusFromError } from "@/lib/ai-call.server";
 import { getProductType, type Background } from "@/lib/product-types";
+import { IP_RULES, findProtectedTerm } from "@/lib/ip-guard";
 
 const BACKGROUND_RULES: Record<Background, string> = {
   transparent:
@@ -22,6 +23,14 @@ export const Route = createFileRoute("/api/generate-design")({
             fast?: boolean;
           };
           if (!prompt) return Response.json({ error: "Missing prompt" }, { status: 400 });
+          const violated = findProtectedTerm(prompt);
+          if (violated)
+            return Response.json(
+              {
+                error: `Your idea mentions "${violated}", a protected brand, character or name. Etsy removes unlicensed designs like this. Rewrite it without the name.`,
+              },
+              { status: 400 },
+            );
 
           const { provider, key } = resolveProvider(request);
           if (!key)
@@ -42,7 +51,7 @@ ${margin} Aspect ratio ${type.aspectRatio}.
 ${BACKGROUND_RULES[type.background]}
 Quality: tack-sharp edges, crisp linework, smooth clean color fills, no noise, no blur, no compression artifacts.
 Do not add mockup products, watermarks, signatures, or logos. Only include lettering if the request or the product type needs it, and spell it exactly.
-Original artwork only: no trademarks, brands, or copyrighted characters.`;
+Original artwork only. ${IP_RULES}`;
 
           // The design is the file the customer buys, so render it natively at 4K (4096px on
           // Gemini 3 Pro Image). The client shrinks copies before sending them to remove.bg/mockups.

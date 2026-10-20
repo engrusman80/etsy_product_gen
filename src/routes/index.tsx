@@ -127,7 +127,7 @@ const DEFAULT_SELECTED = new Set(getProductType(DEFAULT_PRODUCT_TYPE).mockups);
 const DEFAULT_EXPORT_SIZE = 4096;
 const RES = [{ label: "4096", size: DEFAULT_EXPORT_SIZE }];
 
-type SEO = { title: string; description: string; tags: string[] };
+type SEO = { title: string; description: string; tags: string[]; mature?: boolean };
 type Mockup = { id: string; label: string; image: string };
 type ProductItem = {
   seo: SEO;
@@ -809,6 +809,10 @@ function Index() {
       shop,
       productType: typeId,
     });
+    if (seoRes.mature)
+      toast.warning(
+        "This design has swear words. On Etsy, mark the listing as mature content and keep the word out of the title and first photo.",
+      );
 
     const uniquenessClause: Record<typeof uniqueness, string> = {
       subtle:
