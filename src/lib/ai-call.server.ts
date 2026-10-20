@@ -1,4 +1,9 @@
-import { geminiModel, replacementFromError } from "@/lib/gemini-models.server";
+import {
+  geminiModel,
+  geminiTextCandidates,
+  rememberWorkingModel,
+  replacementFromError,
+} from "@/lib/gemini-models.server";
 // Server-only AI dispatcher: routes calls to the default gateway, OpenAI, Google Gemini, or OpenRouter.
 // The client sends `x-ai-provider` and `x-ai-key` headers; this module picks the right endpoint + body shape.
 
@@ -49,10 +54,6 @@ export async function callText(opts: TextOpts): Promise<string> {
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       if (provider === "gemini") {
-        let model =
-          tier === "pro"
-            ? await geminiModel(key, "textPro", "gemini-2.5-pro")
-            : await geminiModel(key, "text", "gemini-2.5-flash");
         const generationConfig: Record<string, unknown> = { maxOutputTokens: maxTokens };
         if (json) generationConfig.responseMimeType = "application/json";
         const body: Record<string, unknown> = {
@@ -60,7 +61,7 @@ export async function callText(opts: TextOpts): Promise<string> {
           generationConfig,
         };
         if (system) body.systemInstruction = { parts: [{ text: system }] };
-        const send = () =>
+        const send = (model: string) =>
           fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
             {
@@ -69,16 +70,43 @@ export async function callText(opts: TextOpts): Promise<string> {
               body: JSON.stringify(body),
             },
           );
-        let res = await send();
-        if (res.status === 404) {
-          // Retired model: Google's error names the replacement, so retry once with it.
+        const queue = await geminiTextCandidates(key, tier);
+        let res: Response | null = null;
+        let quotaErr: Error | null = null;
+        for (let i = 0; i < queue.length && i < 6; i++) {
+          const model = queue[i];
+          res = await send(model);
+          if (res.ok) {
+            rememberWorkingModel(key, tier, model);
+            break;
+          }
           const err = await httpErr(res, "Gemini text");
-          const next = replacementFromError(err.message);
-          if (!next || next === model) throw err;
-          model = next;
-          res = await send();
+          if (res.status === 404) {
+            // Retired model: Google's error names the replacement.
+            const next = replacementFromError(err.message);
+            if (next && !queue.includes(next)) queue.splice(i + 1, 0, next);
+            res = null;
+            continue;
+          }
+          if (res.status === 429 && /quota/i.test(err.message)) {
+            // This model's free quota is used up; each model has its own, so try the next one.
+            quotaErr = err;
+            res = null;
+            continue;
+          }
+          throw err;
         }
-        if (!res.ok) throw await httpErr(res, "Gemini text");
+        if (!res) {
+          if (quotaErr) {
+            const e = new Error(
+              `Gemini free quota is used up on every model this key can use (tried ${queue.slice(0, 6).join(", ")}). Free limits reset daily, or turn on billing for the key at aistudio.google.com. (raw: ${quotaErr.message.slice(0, 200)})`,
+            ) as Error & { status?: number; noRetry?: boolean };
+            e.status = 429;
+            e.noRetry = true;
+            throw e;
+          }
+          throw new Error("No Gemini text model is available for this key.");
+        }
         const j = (await res.json()) as {
           candidates?: { content?: { parts?: { text?: string }[] } }[];
         };
@@ -125,7 +153,7 @@ export async function callText(opts: TextOpts): Promise<string> {
         status === 503 ||
         status === 504 ||
         status === 524;
-      if (!retriable || attempt >= delays.length) throw e;
+      if (!retriable || attempt >= delays.length || (e as { noRetry?: boolean }).noRetry) throw e;
       await new Promise((r) => setTimeout(r, delays[attempt]));
     }
   }

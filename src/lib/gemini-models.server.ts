@@ -85,3 +85,43 @@ export async function geminiModel(
 export function replacementFromError(message: string): string | undefined {
   return message.match(/use models\/(gemini-[\w.-]+)/)?.[1];
 }
+
+const LITE_TEXT = (n: string) =>
+  /^gemini-[\d.]+-flash-lite(-latest|-preview[-\w]*)?$/.test(n) ||
+  /^gemini-flash(-lite)?-latest$/.test(n);
+const lastGood = new Map<string, string>();
+
+/**
+ * Text models to try in order. Each Gemini model has its own free quota, so when one is used up
+ * (429) the caller moves on to the next: newest Pro (pro tier only), newest Flash, then Lite.
+ */
+export async function geminiTextCandidates(key: string, tier: "fast" | "pro"): Promise<string[]> {
+  const names = await listModels(key);
+  if (!names.length)
+    return tier === "pro" ? ["gemini-2.5-pro", "gemini-2.5-flash"] : ["gemini-2.5-flash"];
+  const ranked = (match: (n: string) => boolean) => {
+    const out: string[] = [];
+    let rest = names.filter(match);
+    while (rest.length) {
+      const best = pickGeminiModel(rest, "text") ?? pickGeminiModel(rest, "textPro") ?? rest[0];
+      out.push(best);
+      rest = rest.filter((n) => n !== best);
+    }
+    return out;
+  };
+  const list = [
+    ...(tier === "pro" ? ranked(RULES.textPro.match).slice(0, 2) : []),
+    ...ranked(RULES.text.match).slice(0, 3),
+    ...names
+      .filter(LITE_TEXT)
+      .sort((a, b) => version(b) - version(a))
+      .slice(0, 3),
+  ];
+  const good = lastGood.get(`${key}:${tier}`);
+  const uniq = [...new Set(list)];
+  return good && uniq.includes(good) ? [good, ...uniq.filter((n) => n !== good)] : uniq;
+}
+
+export function rememberWorkingModel(key: string, tier: "fast" | "pro", model: string) {
+  lastGood.set(`${key}:${tier}`, model);
+}
