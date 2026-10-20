@@ -22,7 +22,7 @@ import {
   Check,
   Package,
 } from "lucide-react";
-import { pickIdeas } from "@/lib/crochet/curated";
+import { CURATED_CROCHET_IDEAS, pickIdeas } from "@/lib/crochet/curated";
 import { buildCrochetPdf, patternHash } from "@/lib/crochet/pdf";
 import type { CrochetPattern } from "@/lib/crochet/types";
 
@@ -131,7 +131,9 @@ function fmtBytes(n: number): string {
 export function CrochetStudio({ apiCall, shopName, shop }: Props) {
   const [idea, setIdea] = useState("");
   const [terminology, setTerminology] = useState<"US" | "UK">("US");
-  const [suggestions, setSuggestions] = useState<string[]>(() => pickIdeas(8));
+  // Shuffle after mount: a random pick during render differs between server and client HTML.
+  const [suggestions, setSuggestions] = useState<string[]>(() => CURATED_CROCHET_IDEAS.slice(0, 8));
+  useEffect(() => setSuggestions(pickIdeas(8)), []);
   const [suggBusy, setSuggBusy] = useState(false);
 
   const [busy, setBusy] = useState(false);

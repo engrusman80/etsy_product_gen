@@ -1,3 +1,5 @@
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search, Loader2, ArrowLeft, TrendingUp, AlertCircle, Sparkles } from "lucide-react";
@@ -217,32 +219,18 @@ function KeywordsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 h-16 border-b border-border glass-panel">
-        <div className="flex h-full items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground glow-primary">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="font-display text-lg font-bold tracking-tight">
-                Keyword Research
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-                Etsy Digital Products
-              </span>
-            </div>
-          </div>
-          <Link to="/">
-            <Button variant="ghost" size="sm" className="gap-1.5">
-              <Sparkles className="h-4 w-4" /> Generator
-            </Button>
-          </Link>
+    <div className="flex min-h-screen flex-col bg-background">
+      <SiteHeader active="keywords" />
+      <section className="border-b border-border bg-paper">
+        <div className="container mx-auto max-w-7xl px-6 py-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Etsy digital products
+          </p>
+          <h1 className="mt-2 flex items-center gap-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            <TrendingUp className="h-7 w-7 text-primary" /> Keyword Research
+          </h1>
         </div>
-      </header>
+      </section>
 
       <main className="container mx-auto max-w-7xl px-6 py-6">
         <Card>
@@ -508,12 +496,7 @@ function KeywordsPage() {
           </Card>
         )}
       </main>
-      <footer className="mt-auto border-t border-border bg-muted/20 py-8">
-        <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Digital Product Ai Automation. All rights reserved.</p>
-          <p className="mt-2 text-xs">Built exclusively for Etsy & Adobe Stock sellers.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

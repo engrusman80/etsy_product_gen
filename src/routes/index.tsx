@@ -58,6 +58,8 @@ import { CostEstimateDialog } from "@/components/CostEstimateDialog";
 import { estimateRun, type Estimate, type EstimateInput } from "@/lib/cost-estimator";
 import { CrochetStudio } from "@/components/CrochetStudio";
 import { LandingPage } from "@/components/LandingPage";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { toast } from "sonner";
 import {
   PRINT_DPI,
@@ -78,6 +80,9 @@ export const Route = createFileRoute("/")({
           "Generate SEO-optimized digital product listings, transparent print-ready art, and realistic mockups in one click — ready for commercial use.",
       },
     ],
+  }),
+  validateSearch: (s: Record<string, unknown>): { tab?: "product" | "crochet" } => ({
+    tab: s.tab === "product" || s.tab === "crochet" ? s.tab : undefined,
   }),
   component: Index,
 });
@@ -488,7 +493,11 @@ async function makeShowcaseVideo(b64: string, onProgress?: (p: number) => void):
 }
 
 function Index() {
-  const [activeTab, setActiveTab] = useState<"product" | "crochet" | "home">("home");
+  const search = Route.useSearch();
+  const [activeTab, setActiveTab] = useState<"product" | "crochet" | "home">(search.tab ?? "home");
+  useEffect(() => {
+    if (search.tab) setActiveTab(search.tab);
+  }, [search.tab]);
   const { theme, toggle } = useTheme();
   const [settings, setSettings] = useLocal<Settings>("etsyforge:settings", DEFAULT_SETTINGS);
   const [shop, setShop] = useLocal<Shop>("etsyforge:shop", DEFAULT_SHOP);
@@ -1160,55 +1169,11 @@ function Index() {
   return (
     <>
       <div className="min-h-screen flex flex-col bg-background text-foreground">
-        <header className="sticky top-0 z-30 h-16 border-b border-border bg-background text-foreground shadow-sm">
-          <div className="flex h-full items-center justify-between px-6 max-w-full mx-auto w-full">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div className="flex flex-col leading-tight">
-                <span className="font-display text-lg font-bold tracking-tight">
-                  Digital Product Ai Automation
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={activeTab === "product" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab("product")}
-                className={`mr-2 hidden sm:inline-flex ${activeTab === "product" ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-              >
-                Describe your product
-              </Button>
-              <Button
-                variant={activeTab === "crochet" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab("crochet")}
-                className={`mr-4 hidden sm:inline-flex ${activeTab === "crochet" ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-              >
-                Crochet Pattern Studio
-              </Button>
-              <Link to="/adobe-stock">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="hidden sm:inline">Adobe Stock</span>
-                </Button>
-              </Link>
-              <Link to="/keywords">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
-                >
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="hidden sm:inline">Keyword Research</span>
-                </Button>
-              </Link>
+        <SiteHeader
+          active={activeTab}
+          onNavigate={setActiveTab}
+          actions={
+            <>
               <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <DialogTrigger asChild>
                   <Button
@@ -1565,40 +1530,45 @@ function Index() {
               <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
-            </div>
-          </div>
-        </header>
+            </>
+          }
+        />
 
         {activeTab === "home" ? (
           <LandingPage onStart={() => setActiveTab("product")} />
         ) : (
           <div className="flex flex-1 flex-col">
-            <aside
-              className={`w-full border-b border-border bg-card/20 ${activeTab !== "product" ? "hidden" : ""}`}
-            >
+            <aside className={`w-full ${activeTab !== "product" ? "hidden" : ""}`}>
+              <div className="border-b border-border bg-paper">
+                <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-end sm:justify-between lg:px-8">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                      Product generator
+                    </p>
+                    <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+                      Describe your product
+                    </h1>
+                    <p className="mt-2 max-w-2xl text-muted-foreground">
+                      Get Etsy SEO copy, native 4K print-ready art (PNG, JPG, SVG, PDF, EPS, AI,
+                      DXF) and realistic mockups in one run.
+                    </p>
+                  </div>
+                  <a
+                    href="/editor?demo=1"
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    <Sparkles className="h-4 w-4 text-primary" /> Try Image Studio demo
+                  </a>
+                </div>
+              </div>
               <div className="mx-auto w-full max-w-5xl p-6 lg:p-8">
-                <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Wand2 className="h-5 w-5" /> Describe your product
-                    </CardTitle>
-                    <CardDescription>
-                      Generate Etsy SEO copy, 4K print-ready art (PNG/JPG/SVG/PDF/EPS/AI/DXF), and
-                      4K realistic mockups — all in one click. Commercial-use ready.
-                    </CardDescription>
-                    <div className="mt-2">
-                      <a
-                        href="/editor?demo=1"
-                        target="_blank"
-                        rel="noopener"
-                        className="inline-flex items-center gap-1 rounded-md border border-dashed border-border bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        <Sparkles className="h-3 w-3" /> Try Image Studio with a demo product (no
-                        API needed)
-                      </a>
-                    </div>
+                <Card className="paper-card">
+                  <CardHeader className="sr-only">
+                    <CardTitle>Describe your product</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 p-6 sm:p-8">
                     <div>
                       <Label htmlFor="idea">Product idea(s)</Label>
                       <Textarea
@@ -1965,7 +1935,12 @@ function Index() {
                       </CollapsibleContent>
                     </Collapsible>
 
-                    <Button onClick={generate} disabled={busy || !idea.trim()} size="lg">
+                    <Button
+                      onClick={generate}
+                      disabled={busy || !idea.trim()}
+                      size="lg"
+                      className="h-12 rounded-full px-8 text-base glow-primary"
+                    >
                       {busy ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" /> Working…
@@ -1994,7 +1969,19 @@ function Index() {
             </aside>
 
             <section className="flex-1 min-w-0">
-              <div className="p-6 lg:p-8 space-y-6">
+              {activeTab === "crochet" && (
+                <div className="border-b border-border bg-paper">
+                  <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:px-8">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                      Printable PDF patterns
+                    </p>
+                    <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+                      Crochet Pattern Studio
+                    </h1>
+                  </div>
+                </div>
+              )}
+              <div className="mx-auto w-full max-w-7xl space-y-6 p-6 lg:p-8">
                 <div className={activeTab !== "crochet" ? "hidden" : "block"}>
                   <CrochetStudio
                     apiCall={api}
@@ -2427,89 +2414,7 @@ function Index() {
             </section>
           </div>
         )}
-        <footer className="mt-auto border-t border-border bg-muted/20 text-foreground pt-12 pb-8">
-          <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <span className="font-display text-lg font-bold">
-                  Digital Product Ai Automation
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                The ultimate tool for generating AI-powered, SEO-optimized digital product listings
-                and ready-to-use print assets exclusively for Etsy and Adobe Stock sellers.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Tools</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <Link to="/" className="hover:text-foreground transition-colors">
-                    Etsy Listing Generator
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/adobe-stock" className="hover:text-foreground transition-colors">
-                    Adobe Stock Studio
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/keywords" className="hover:text-foreground transition-colors">
-                    Keyword Research
-                  </Link>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setSettingsOpen(true)}
-                    className="hover:text-foreground transition-colors"
-                  >
-                    Settings & API Keys
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Resources</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <a
-                    href="https://www.etsy.com/sell"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-foreground transition-colors"
-                  >
-                    Etsy Seller Handbook
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://contributor.stock.adobe.com/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-foreground transition-colors"
-                  >
-                    Adobe Stock Contributor
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-foreground transition-colors">
-                    Terms of Service
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-foreground transition-colors">
-                    Privacy Policy
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="max-w-6xl mx-auto px-6 mt-12 pt-8 border-t border-border text-sm text-muted-foreground flex flex-col md:flex-row justify-between items-center">
-            <p>© {new Date().getFullYear()} Digital Product Ai Automation. All rights reserved.</p>
-            <p className="mt-2 md:mt-0">Built exclusively for Etsy & Adobe Stock sellers.</p>
-          </div>
-        </footer>
+        <SiteFooter />
       </div>
 
       <CostEstimateDialog
@@ -2649,10 +2554,15 @@ function ArtworkTile({
         </div>
       </div>
       <div
-        className={
+        className={transparentBg ? "rounded-md border border-border" : ""}
+        style={
           transparentBg
-            ? "rounded-md border border-border bg-[conic-gradient(at_top_left,_#e5e7eb_25%,_transparent_25%,_transparent_50%,_#e5e7eb_50%,_#e5e7eb_75%,_transparent_75%)] bg-[length:20px_20px]"
-            : ""
+            ? {
+                // Checkerboard so the transparent cut-out is visible.
+                background:
+                  "repeating-conic-gradient(color-mix(in srgb, var(--foreground) 9%, transparent) 0% 25%, transparent 0% 50%) 50% / 20px 20px",
+              }
+            : undefined
         }
       >
         <img

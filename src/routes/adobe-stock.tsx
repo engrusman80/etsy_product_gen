@@ -1,3 +1,5 @@
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -100,28 +102,18 @@ function AdobeStock() {
   const keys = useApiKeys();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            >
-              <Home className="h-4 w-4" /> Home
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              Adobe Stock Studio
-            </h1>
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              Policy-compliant
-            </Badge>
-          </div>
-          <KeysDialog keys={keys} />
+    <div className="flex min-h-screen flex-col bg-background">
+      <SiteHeader active="adobe" actions={<KeysDialog keys={keys} />} />
+      <section className="border-b border-border bg-paper">
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Policy-compliant
+          </p>
+          <h1 className="mt-2 flex items-center gap-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            <ShieldCheck className="h-7 w-7 text-primary" /> Adobe Stock Studio
+          </h1>
         </div>
-      </header>
+      </section>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         <Card className="bg-primary/5 border-primary/20">
@@ -171,12 +163,7 @@ function AdobeStock() {
           </TabsContent>
         </Tabs>
       </main>
-      <footer className="mt-auto border-t border-border bg-muted/20 py-8">
-        <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Digital Product Ai Automation. All rights reserved.</p>
-          <p className="mt-2 text-xs">Built exclusively for Etsy & Adobe Stock sellers.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
