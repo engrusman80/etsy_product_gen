@@ -182,7 +182,7 @@ export function LandingPage({ onStart }: { onStart: (type?: ProductTypeId) => vo
             </div>
             <ul className="mt-8 grid max-w-lg gap-2 text-sm text-muted-foreground sm:grid-cols-2">
               {[
-                "Use your own Gemini, OpenAI or OpenRouter key",
+                "Use your own Gemini or OpenRouter key",
                 "Cost estimate before every run",
                 "Trademarks and famous characters blocked",
                 "Commercial-use original artwork",

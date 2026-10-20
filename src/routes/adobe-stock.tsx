@@ -49,7 +49,7 @@ export const Route = createFileRoute("/adobe-stock")({
   component: AdobeStock,
 });
 
-type Provider = "gemini" | "openai" | "xai";
+type Provider = "gemini" | "openrouter";
 
 /** Adobe Stock reads the shared keys from the Settings page. */
 function useApiKeys() {

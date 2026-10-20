@@ -23,13 +23,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-type KeyField =
-  | "geminiKey"
-  | "openaiKey"
-  | "openrouterKey"
-  | "xaiKey"
-  | "removeBgKey"
-  | "lovableKey";
+type KeyField = "geminiKey" | "openrouterKey" | "removeBgKey";
 
 const KEYS: Array<{
   field: KeyField;
@@ -39,7 +33,7 @@ const KEYS: Array<{
   getLabel: string;
   usedFor: string;
   /** Provider header used to test the key, when it can be tested with a text call. */
-  check?: AIProvider | "xai";
+  check?: AIProvider;
 }> = [
   {
     field: "geminiKey",
@@ -48,17 +42,8 @@ const KEYS: Array<{
     getUrl: "https://aistudio.google.com/apikey",
     getLabel: "aistudio.google.com/apikey",
     usedFor:
-      "Free key works for SEO text, crochet patterns and keyword ideas. Designs and mockups need billing turned on for the key.",
+      "Gemini 3 Pro Image, native 4K artwork. A free key covers SEO text and crochet patterns; designs and mockups need billing turned on for the key.",
     check: "gemini",
-  },
-  {
-    field: "openaiKey",
-    label: "OpenAI",
-    placeholder: "sk-...",
-    getUrl: "https://platform.openai.com/api-keys",
-    getLabel: "platform.openai.com/api-keys",
-    usedFor: "Pay-per-use. Text plus gpt-image-1 designs and mockups (max 1536px).",
-    check: "openai",
   },
   {
     field: "openrouterKey",
@@ -66,17 +51,9 @@ const KEYS: Array<{
     placeholder: "sk-or-...",
     getUrl: "https://openrouter.ai/keys",
     getLabel: "openrouter.ai/keys",
-    usedFor: "One prepaid key for Gemini 4K images and many text models.",
+    usedFor:
+      "The same Gemini 3 Pro Image 4K model through one prepaid key. Handy if Gemini is not available in your country.",
     check: "openrouter",
-  },
-  {
-    field: "xaiKey",
-    label: "xAI Grok",
-    placeholder: "xai-...",
-    getUrl: "https://console.x.ai",
-    getLabel: "console.x.ai",
-    usedFor: "Optional image provider in Adobe Stock Studio.",
-    check: "xai",
   },
   {
     field: "removeBgKey",
@@ -85,24 +62,13 @@ const KEYS: Array<{
     getUrl: "https://www.remove.bg/api",
     getLabel: "remove.bg/api",
     usedFor:
-      "Optional. Cleaner background removal (50 free per month). Without it the app removes white backgrounds in your browser.",
-  },
-  {
-    field: "lovableKey",
-    label: "Default AI gateway (Lovable)",
-    placeholder: "Only on Lovable hosting",
-    getUrl: "https://lovable.dev",
-    getLabel: "lovable.dev",
-    usedFor: "Only needed when the app is hosted on Lovable. Leave empty on your own computer.",
-    check: "lovable",
+      "Optional. The cleanest transparent cut-outs (hair, soft edges). 50 free per month. Without it the app removes white backgrounds in your browser.",
   },
 ];
 
 const PROVIDERS: Array<{ id: AIProvider; label: string; key: KeyField }> = [
   { id: "gemini", label: "Google Gemini", key: "geminiKey" },
-  { id: "openai", label: "OpenAI", key: "openaiKey" },
   { id: "openrouter", label: "OpenRouter", key: "openrouterKey" },
-  { id: "lovable", label: "Default AI (Lovable hosting)", key: "lovableKey" },
 ];
 
 function SettingsPage() {
@@ -172,8 +138,8 @@ function SettingsPage() {
           </div>
           {using !== settings.aiProvider && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Default AI has no key here, so the app will use{" "}
-              {PROVIDERS.find((p) => p.id === using)?.label} instead.
+              {PROVIDERS.find((p) => p.id === settings.aiProvider)?.label} has no key, so the app
+              will use {PROVIDERS.find((p) => p.id === using)?.label} instead.
             </p>
           )}
           {!settings[PROVIDERS.find((p) => p.id === using)!.key] && (
@@ -196,7 +162,7 @@ function SettingsPage() {
             </select>
             <p className="mt-1 text-xs text-muted-foreground">
               Fast mode is fine for stickers, wallpapers and testing ideas. Use native 4K for wall
-              art and large prints. OpenAI has one quality level.
+              art and large prints.
             </p>
           </div>
         </Panel>
@@ -227,9 +193,8 @@ function SettingsPage() {
             onChange={(e) => update({ adobeProvider: e.target.value as AdobeProvider })}
             aria-label="Adobe Stock image provider"
           >
-            <option value="gemini">Google Gemini (cheapest)</option>
-            <option value="openai">OpenAI gpt-image-1 (most photorealistic)</option>
-            <option value="xai">xAI Grok 2 Image</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openrouter">OpenRouter</option>
           </select>
           <p className="mt-1 text-xs text-muted-foreground">
             Video generation always uses the Gemini key.

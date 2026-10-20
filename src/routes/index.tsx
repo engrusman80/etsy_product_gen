@@ -60,7 +60,7 @@ import {
   traceVector,
   withDpi,
 } from "@/lib/print-export";
-import { activeProvider, hasAiKey, useSettings } from "@/lib/settings-store";
+import { activeProvider, hasAiKey, keyFor, useSettings } from "@/lib/settings-store";
 import {
   DEFAULT_PRODUCT_TYPE,
   PRODUCT_TYPES,
@@ -697,14 +697,7 @@ function Index() {
   async function api<T>(url: string, body: unknown): Promise<T> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     const provider = activeProvider(settings);
-    const aiKey =
-      provider === "openai"
-        ? settings.openaiKey
-        : provider === "gemini"
-          ? settings.geminiKey
-          : provider === "openrouter"
-            ? settings.openrouterKey
-            : settings.lovableKey;
+    const aiKey = keyFor(settings, provider);
     headers["X-AI-Provider"] = provider;
     if (aiKey) headers["X-AI-Key"] = aiKey;
     if (settings.removeBgKey) headers["X-RemoveBg-Key"] = settings.removeBgKey;
@@ -717,31 +710,16 @@ function Index() {
       /* non-JSON */
     }
     if (!r.ok) {
-      const providerLabel =
-        provider === "lovable"
-          ? "Default AI"
-          : provider === "openai"
-            ? "OpenAI"
-            : provider === "gemini"
-              ? "Google Gemini"
-              : provider === "openrouter"
-                ? "OpenRouter"
-                : provider;
+      const providerLabel = provider === "gemini" ? "Google Gemini" : "OpenRouter";
       const rawMsg = j.error || text || `Request failed (${r.status})`;
       if (r.status === 504 || /timeout/i.test(rawMsg)) {
         throw new Error(`${providerLabel} took too long to respond. Please try again.`);
       }
       if (r.status === 402 || /credit|quota|exhaust|insufficient|billing|payment/i.test(rawMsg)) {
         const hint =
-          provider === "lovable"
-            ? "Workspace credits exhausted. Switch provider in Settings (Gemini has 1,500 free/day)."
-            : provider === "openai"
-              ? "Top up at platform.openai.com/account/billing, or switch provider in Settings."
-              : provider === "gemini"
-                ? "Check your Google AI Studio quota at aistudio.google.com/apikey, or switch provider in Settings."
-                : provider === "openrouter"
-                  ? "Top up at openrouter.ai/credits, or switch provider in Settings."
-                  : "Switch provider in Settings.";
+          provider === "gemini"
+            ? "Check your Google AI Studio quota and billing at aistudio.google.com/apikey, or switch provider in Settings."
+            : "Top up at openrouter.ai/credits, or switch provider in Settings.";
         throw new Error(`${providerLabel} credits exhausted — ${hint} (raw: ${rawMsg})`);
       }
       if (
@@ -760,7 +738,7 @@ function Index() {
       }
       if (r.status === 401 && /missing api key/i.test(rawMsg)) {
         throw new Error(
-          "No AI key is set. Open Settings (top menu) and add a Google Gemini, OpenAI or OpenRouter API key.",
+          "No AI key is set. Open Settings (top menu) and add a Google Gemini or OpenRouter API key.",
         );
       }
       if (r.status === 401 || r.status === 403) {
@@ -812,7 +790,7 @@ function Index() {
     if (settings.imageQuality === "fast") return;
     if (width && Math.max(width, height) < 4096) {
       toast.warning(
-        `Artwork came back at ${width}×${height}px, not native 4K. Files are upscaled to 4096px; for true 4K use Google Gemini, OpenRouter or Default AI (OpenAI tops out at 1536px).`,
+        `Artwork came back at ${width}×${height}px, not native 4K. Files are upscaled to 4096px. The 4K model may have been busy, so try again for native 4K.`,
         { duration: 10000 },
       );
     }
