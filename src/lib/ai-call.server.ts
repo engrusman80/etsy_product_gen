@@ -1,3 +1,4 @@
+import { geminiModel, replacementFromError } from "@/lib/gemini-models.server";
 // Server-only AI dispatcher: routes calls to the default gateway, OpenAI, Google Gemini, or OpenRouter.
 // The client sends `x-ai-provider` and `x-ai-key` headers; this module picks the right endpoint + body shape.
 
@@ -48,8 +49,10 @@ export async function callText(opts: TextOpts): Promise<string> {
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       if (provider === "gemini") {
-        const model = tier === "pro" ? "gemini-2.5-pro" : "gemini-2.5-flash";
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+        let model =
+          tier === "pro"
+            ? await geminiModel(key, "textPro", "gemini-2.5-pro")
+            : await geminiModel(key, "text", "gemini-2.5-flash");
         const generationConfig: Record<string, unknown> = { maxOutputTokens: maxTokens };
         if (json) generationConfig.responseMimeType = "application/json";
         const body: Record<string, unknown> = {
@@ -57,11 +60,24 @@ export async function callText(opts: TextOpts): Promise<string> {
           generationConfig,
         };
         if (system) body.systemInstruction = { parts: [{ text: system }] };
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
+        const send = () =>
+          fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
+        let res = await send();
+        if (res.status === 404) {
+          // Retired model: Google's error names the replacement, so retry once with it.
+          const err = await httpErr(res, "Gemini text");
+          const next = replacementFromError(err.message);
+          if (!next || next === model) throw err;
+          model = next;
+          res = await send();
+        }
         if (!res.ok) throw await httpErr(res, "Gemini text");
         const j = (await res.json()) as {
           candidates?: { content?: { parts?: { text?: string }[] } }[];
@@ -203,7 +219,10 @@ export async function callImage(opts: ImageOpts): Promise<string> {
   if (provider === "gemini") {
     // Hires uses Gemini 3 Pro Image (Nano Banana 2) — highest native fidelity.
     // Falls back to gemini-2.5-flash-image if the pro model is overloaded.
-    const primary = hires ? "gemini-3-pro-image-preview" : "gemini-2.5-flash-image";
+    const fastModel = await geminiModel(key, "imageFast", "gemini-2.5-flash-image");
+    const primary = hires
+      ? await geminiModel(key, "imagePro", "gemini-3-pro-image-preview")
+      : fastModel;
     try {
       return await geminiImageWithRetry(
         primary,
@@ -236,14 +255,7 @@ export async function callImage(opts: ImageOpts): Promise<string> {
           "Gemini image API is not available in your region. Add a Default gateway key (LOVABLE_API_KEY) or OpenRouter key in Settings to use the proxied route.",
         );
       }
-      if (hires)
-        return geminiImageWithRetry(
-          "gemini-2.5-flash-image",
-          key,
-          prompt,
-          inputImageB64,
-          aspectRatio,
-        );
+      if (hires) return geminiImageWithRetry(fastModel, key, prompt, inputImageB64, aspectRatio);
       throw e;
     }
   }
@@ -367,7 +379,8 @@ async function callImageFallbackGemini(
   prompt: string,
   inputImageB64?: string,
 ): Promise<string> {
-  return geminiImageWithRetry("gemini-2.5-flash-image", key, prompt, inputImageB64, undefined);
+  const model = await geminiModel(key, "imageFast", "gemini-2.5-flash-image");
+  return geminiImageWithRetry(model, key, prompt, inputImageB64, undefined);
 }
 
 async function geminiImageWithRetry(

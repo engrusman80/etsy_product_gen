@@ -54,9 +54,9 @@ const GEMINI: ProviderCost = {
     "AI Studio keys are free for text (SEO, patterns). Image models need billing enabled on the key.",
   billingUrl: "https://aistudio.google.com/apikey",
   models: {
-    text: "gemini-2.5-flash",
-    image: "gemini-3-pro-image-preview (4K)",
-    mockup: "gemini-2.5-flash-image",
+    text: "newest Gemini Flash on your key",
+    image: "newest Gemini Pro Image (4K)",
+    mockup: "newest Gemini Flash Image",
   },
 };
 
