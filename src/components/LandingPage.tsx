@@ -8,7 +8,6 @@ import {
   Image as ImageIcon,
   Layers,
   PenTool,
-  Search,
   ShieldCheck,
   Shirt,
   Sparkles,
@@ -16,6 +15,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { PRODUCT_TYPES, type ProductTypeId } from "@/lib/product-types";
 
 const DELIVERABLES = [
   {
@@ -53,8 +53,8 @@ const DELIVERABLES = [
 const STEPS = [
   {
     n: "01",
-    title: "Describe the product",
-    body: "Type an idea like “cute cat t-shirt design” or paste up to ten keywords for a batch.",
+    title: "Pick a type and describe it",
+    body: "Choose a sticker sheet, wall art, coloring page or any other type, then type an idea or paste up to ten for a batch.",
   },
   {
     n: "02",
@@ -140,7 +140,7 @@ function ProductPreview() {
   );
 }
 
-export function LandingPage({ onStart }: { onStart: () => void }) {
+export function LandingPage({ onStart }: { onStart: (type?: ProductTypeId) => void }) {
   return (
     <div className="w-full overflow-x-hidden bg-background text-foreground">
       {/* Hero */}
@@ -164,7 +164,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button
                 size="lg"
-                onClick={onStart}
+                onClick={() => onStart()}
                 className="h-12 rounded-full px-7 text-base glow-primary"
               >
                 <Wand2 className="h-4 w-4" /> Create a product
@@ -175,9 +175,9 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
                 variant="outline"
                 className="h-12 rounded-full bg-card px-7 text-base"
               >
-                <Link to="/keywords">
-                  <Search className="h-4 w-4" /> Research keywords first
-                </Link>
+                <a href="#product-types">
+                  <Layers className="h-4 w-4" /> Browse {PRODUCT_TYPES.length} product types
+                </a>
               </Button>
             </div>
             <ul className="mt-8 grid max-w-lg gap-2 text-sm text-muted-foreground sm:grid-cols-2">
@@ -224,6 +224,47 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
         </div>
       </section>
 
+      {/* Product types */}
+      <section id="product-types" className="mx-auto max-w-7xl scroll-mt-20 px-4 pb-20 sm:px-6">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Product types
+          </p>
+          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            The Etsy downloads that sell.
+          </h2>
+          <p className="mt-4 text-muted-foreground">
+            Each type has its own art direction, print size, file set and listing mockups.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PRODUCT_TYPES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onStart(t.id)}
+              className="paper-card group flex flex-col p-5 text-left transition-transform hover:-translate-y-0.5"
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="font-display text-lg font-semibold">{t.label}</span>
+                <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
+              </span>
+              <span className="mt-1 text-sm text-muted-foreground">{t.blurb}</span>
+              <span className="mt-3 flex flex-wrap gap-1">
+                {t.formats.slice(0, 5).map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="border-y border-border bg-paper">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.8fr_1.2fr]">
@@ -259,18 +300,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
 
       {/* More studios */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Link to="/keywords" className="paper-card group p-6">
-            <Search className="h-5 w-5 text-primary" />
-            <h3 className="mt-4 font-display text-xl font-semibold">Keyword research</h3>
-            <p className="mt-1.5 text-[15px] text-muted-foreground">
-              Find low-competition niches with search volume and difficulty before you design.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-              Open{" "}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </Link>
+        <div className="grid gap-4 md:grid-cols-2">
           <Link to="/" search={{ tab: "crochet" }} className="paper-card group p-6">
             <FileImage className="h-5 w-5 text-primary" />
             <h3 className="mt-4 font-display text-xl font-semibold">Crochet pattern studio</h3>
@@ -311,7 +341,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
             </div>
             <Button
               size="lg"
-              onClick={onStart}
+              onClick={() => onStart()}
               className="h-12 shrink-0 rounded-full bg-primary px-7 text-base text-primary-foreground hover:bg-primary/90"
             >
               <Download className="h-4 w-4" /> Start creating

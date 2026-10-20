@@ -46,6 +46,26 @@ const MOCKUP_PROMPTS: Record<string, string> = {
     "Place the provided artwork centered on the chest of a white baseball tee with black 3/4 sleeves, flat-lay on a wooden surface, professional product photography.",
   puzzle:
     "Print the provided artwork on a rectangular jigsaw puzzle, hero shot on a clean wooden table, slight 3/4 perspective, professional product photography.",
+  tumbler:
+    "Wrap the provided artwork fully around a glossy 20oz stainless steel skinny tumbler with a clear lid and metal straw, sublimation print look, hero product shot on a soft neutral background, realistic reflections, professional product photography.",
+  "sticker-sheet-mockup":
+    "Show the provided artwork printed as a glossy kiss-cut vinyl sticker sheet lying on a pastel desk next to scissors, a pen and a planner, slight angle, soft daylight, professional flat-lay product photography.",
+  "clipart-flatlay":
+    "Etsy clipart preview: show the provided illustrated elements used on a stylish flat-lay of craft projects (a scrapbook page, an invitation card and a gift tag) on a light marble desk, soft daylight, professional product photography, elements keep their exact look.",
+  "gallery-wall":
+    "Display the provided artwork as the large centerpiece print in a natural oak frame with a white mat on a warm neutral living room wall above a styled console table with a vase, professional interior photography, soft daylight, accurate print colors, no other artwork.",
+  "coloring-page-mockup":
+    "Show the provided coloring page printed on a sheet of white paper lying on a wooden table, partly colored in with colored pencils, with a few pencils and a cup of tea beside it, overhead flat-lay, soft daylight, professional product photography.",
+  "digital-paper-mockup":
+    "Etsy digital paper preview: show the provided pattern as several overlapping square paper sheets fanned out on a white desk, plus the pattern used on a wrapped gift box, soft daylight, professional flat-lay product photography, pattern scale and colors unchanged.",
+  "planner-mockup":
+    "Show the provided planner page printed on white paper inside an open ring binder on a light wooden desk with a pen, a coffee cup and a small plant, overhead flat-lay, soft daylight, professional product photography.",
+  "ipad-planner":
+    "Show the provided planner page displayed on the screen of a modern iPad with an Apple Pencil-style stylus beside it, on a minimalist desk, slight angle, soft daylight, professional product photography, screen content sharp and unchanged.",
+  "invitation-flatlay":
+    "Show the provided card design printed as a 5x7 invitation card on textured cardstock with a matching envelope, wax seal and dried flowers, elegant overhead flat-lay on linen, soft daylight, professional stationery photography.",
+  "phone-screen":
+    "Show the provided image as the lock-screen wallpaper on a modern smartphone held in a hand against a soft blurred aesthetic background, the wallpaper fills the whole screen with a lock-screen clock at the top, professional lifestyle product photography.",
   blanket:
     "Print the provided artwork on a soft fleece throw blanket draped on a cream sofa, cozy lifestyle photography, soft daylight.",
 
@@ -69,11 +89,12 @@ export const Route = createFileRoute("/api/generate-mockup")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { image, mockup, customPrompt, tweak } = (await request.json()) as {
+          const { image, mockup, customPrompt, tweak, formats } = (await request.json()) as {
             image: string;
             mockup: string;
             customPrompt?: string;
             tweak?: string;
+            formats?: string[];
           };
           if (!image || !mockup) return Response.json({ error: "Missing fields" }, { status: 400 });
 
@@ -87,6 +108,14 @@ export const Route = createFileRoute("/api/generate-mockup")({
             const p = MOCKUP_PROMPTS[mockup];
             if (!p) return Response.json({ error: "Unknown mockup type" }, { status: 400 });
             prompt = p;
+            // The download cover lists the files this product type actually ships with.
+            if (mockup === "digital-download" && Array.isArray(formats) && formats.length) {
+              const badges = formats.slice(0, 7).map((f) => String(f).toUpperCase().slice(0, 12));
+              prompt = prompt.replace(
+                /a row of 7 [^.]+\./,
+                `a row of ${badges.length} dark charcoal blue-gray (#2f3d4a) rounded pill badges, equally spaced, each with bold white uppercase text in order: ${badges.join(", ")}.`,
+              );
+            }
           }
           if (tweak && tweak.trim()) {
             prompt += ` Additional user-requested adjustments: ${tweak.trim()}.`;

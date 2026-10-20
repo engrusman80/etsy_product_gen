@@ -69,6 +69,12 @@ import {
   traceVector,
   withDpi,
 } from "@/lib/print-export";
+import {
+  DEFAULT_PRODUCT_TYPE,
+  PRODUCT_TYPES,
+  getProductType,
+  type ProductTypeId,
+} from "@/lib/product-types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -112,23 +118,32 @@ const MOCKUPS = [
   { id: "enamel-pin", label: "Enamel Pin" },
   { id: "coaster", label: "Coaster" },
   { id: "puzzle", label: "Jigsaw Puzzle" },
+  { id: "tumbler", label: "20oz Skinny Tumbler" },
+  { id: "sticker-sheet-mockup", label: "Sticker Sheet on Desk" },
+  { id: "clipart-flatlay", label: "Clipart Craft Flat-lay" },
+  { id: "gallery-wall", label: "Framed Print Above Console" },
+  { id: "coloring-page-mockup", label: "Coloring Page with Pencils" },
+  { id: "digital-paper-mockup", label: "Digital Paper Fan + Gift" },
+  { id: "planner-mockup", label: "Planner in Binder" },
+  { id: "ipad-planner", label: "Planner on iPad" },
+  { id: "invitation-flatlay", label: "Invitation Flat-lay" },
+  { id: "phone-screen", label: "Phone Lock Screen" },
 ];
 
-const DEFAULT_SELECTED = new Set([
-  "digital-download",
-  "banner-top-bottom",
-  "white-tshirt",
-  "mug",
-  "wall-frame",
-  "tote-bag",
-]);
+const DEFAULT_SELECTED = new Set(getProductType(DEFAULT_PRODUCT_TYPE).mockups);
 
 const DEFAULT_EXPORT_SIZE = 4096;
 const RES = [{ label: "4096", size: DEFAULT_EXPORT_SIZE }];
 
 type SEO = { title: string; description: string; tags: string[] };
 type Mockup = { id: string; label: string; image: string };
-type ProductItem = { seo: SEO; rawImage: string; transparentImage: string; mockups: Mockup[] };
+type ProductItem = {
+  seo: SEO;
+  rawImage: string;
+  transparentImage: string;
+  mockups: Mockup[];
+  productType: ProductTypeId;
+};
 type BatchProduct = {
   keyword: string;
   items: Array<ProductItem | null>;
@@ -173,13 +188,6 @@ function slugify(s: string): string {
 }
 
 type AIProvider = "lovable" | "openai" | "gemini" | "openrouter";
-export type KwProvider =
-  | "semrush"
-  | "semrush_user"
-  | "ahrefs"
-  | "keywords_everywhere"
-  | "erank"
-  | "alura";
 type Settings = {
   aiProvider: AIProvider;
   lovableKey: string;
@@ -187,10 +195,6 @@ type Settings = {
   geminiKey: string;
   openrouterKey: string;
   removeBgKey: string;
-  kwProvider: KwProvider;
-  semrushUserKey: string;
-  ahrefsKey: string;
-  kwEverywhereKey: string;
 };
 type Shop = {
   shopName: string;
@@ -209,10 +213,6 @@ const DEFAULT_SETTINGS: Settings = {
   geminiKey: "",
   openrouterKey: "",
   removeBgKey: "",
-  kwProvider: "semrush",
-  semrushUserKey: "",
-  ahrefsKey: "",
-  kwEverywhereKey: "",
 };
 /**
  * The Default AI gateway only has a key when the app runs on Lovable hosting. When the user
@@ -279,20 +279,27 @@ async function canvasToBlob(
   return withDpi(blob);
 }
 
+/** Output size with `long` px on the longer edge, keeping the image's aspect ratio. */
+function fitLong(img: { width: number; height: number }, long: number): [number, number] {
+  if (img.width >= img.height) return [long, Math.round((long * img.height) / img.width)];
+  return [Math.round((long * img.width) / img.height), long];
+}
+
 async function resizePng(b64: string, size: number, withBg: string | null): Promise<Blob> {
   const img = await loadImage(b64);
+  const [w, h] = fitLong(img, size);
   const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   if (withBg) {
     ctx.fillStyle = withBg;
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, w, h);
   }
-  drawImageHQ(ctx, img, 0, 0, img.width, img.height, 0, 0, size, size);
-  if (size > img.width) applyUnsharp(ctx, size, size);
+  drawImageHQ(ctx, img, 0, 0, img.width, img.height, 0, 0, w, h);
+  if (w > img.width) applyUnsharp(ctx, w, h);
   return canvasToBlob(c, withBg ? "image/jpeg" : "image/png", withBg ? 0.98 : undefined);
 }
 
@@ -314,17 +321,39 @@ async function imageDataUrlAtSize(
 async function makePdf(b64: string, size = DEFAULT_EXPORT_SIZE): Promise<Blob> {
   const imageUrl = await imageDataUrlAtSize(b64, size, "image/png");
   // Page size in inches at print DPI, so the PDF prints at the same size as the PNG.
-  const w = size / PRINT_DPI,
-    h = size / PRINT_DPI;
+  const [pw, ph] = fitLong(await loadImage(b64), size);
+  const w = pw / PRINT_DPI,
+    h = ph / PRINT_DPI;
   const pdf = new jsPDF({ unit: "in", format: [w, h], orientation: w > h ? "l" : "p" });
   pdf.addImage(imageUrl, "PNG", 0, 0, w, h, undefined, "FAST");
   return pdf.output("blob");
 }
 
-function makeSvg(b64: string, size = DEFAULT_EXPORT_SIZE): Blob {
+/** Printable page PDF (US Letter or A4) with the artwork fitted inside a 0.25in margin. */
+async function makePagePdf(b64: string, page: "letter" | "a4"): Promise<Blob> {
+  const img = await loadImage(b64);
+  const [pw, ph] = page === "letter" ? [8.5, 11] : [8.27, 11.69];
+  const landscape = img.width > img.height;
+  const [W, H] = landscape ? [ph, pw] : [pw, ph];
+  const m = 0.25;
+  const scale = Math.min((W - 2 * m) / img.width, (H - 2 * m) / img.height);
+  const w = img.width * scale,
+    h = img.height * scale;
+  const imageUrl = await imageDataUrlAtSize(
+    b64,
+    Math.round(Math.max(W, H) * PRINT_DPI),
+    "image/jpeg",
+  );
+  const pdf = new jsPDF({ unit: "in", format: [pw, ph], orientation: landscape ? "l" : "p" });
+  pdf.addImage(imageUrl, "JPEG", (W - w) / 2, (H - h) / 2, w, h, undefined, "FAST");
+  return pdf.output("blob");
+}
+
+async function makeSvg(b64: string, size = DEFAULT_EXPORT_SIZE): Promise<Blob> {
+  const [w, h] = fitLong(await loadImage(b64), size);
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <image href="data:image/png;base64,${b64}" width="${size}" height="${size}"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <image href="data:image/png;base64,${b64}" width="${w}" height="${h}"/>
 </svg>`;
   return new Blob([svg], { type: "image/svg+xml" });
 }
@@ -336,16 +365,17 @@ async function resizeJpegHQ(
   bg = "#ffffff",
 ): Promise<Blob> {
   const img = await loadImage(b64);
+  const [w, h] = fitLong(img, size);
   const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, size, size);
-  drawImageHQ(ctx, img, 0, 0, img.width, img.height, 0, 0, size, size);
-  if (size > img.width) applyUnsharp(ctx, size, size);
+  ctx.fillRect(0, 0, w, h);
+  drawImageHQ(ctx, img, 0, 0, img.width, img.height, 0, 0, w, h);
+  if (w > img.width) applyUnsharp(ctx, w, h);
   return canvasToBlob(c, "image/jpeg", quality);
 }
 
@@ -356,16 +386,17 @@ async function resizeJpegUnder(
   bg = "#ffffff",
 ): Promise<Blob> {
   const img = await loadImage(b64);
+  const [w, h] = fitLong(img, size);
   const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, size, size);
-  drawImageHQ(ctx, img, 0, 0, img.width, img.height, 0, 0, size, size);
-  if (size > img.width) applyUnsharp(ctx, size, size);
+  ctx.fillRect(0, 0, w, h);
+  drawImageHQ(ctx, img, 0, 0, img.width, img.height, 0, 0, w, h);
+  if (w > img.width) applyUnsharp(ctx, w, h);
   let lo = 0.5,
     hi = 0.98,
     best: Blob | null = null;
@@ -383,24 +414,25 @@ async function resizeJpegUnder(
   return best;
 }
 
-async function makeEps(b64: string, size: number): Promise<Blob> {
-  const jpegBlob = await resizeJpegUnder(b64, size, 5_000_000, "#ffffff");
+async function makeEps(b64: string, long: number): Promise<Blob> {
+  const [w, h] = fitLong(await loadImage(b64), long);
+  const jpegBlob = await resizeJpegUnder(b64, long, 5_000_000, "#ffffff");
   const buf = new Uint8Array(await jpegBlob.arrayBuffer());
   let hex = "";
   for (let i = 0; i < buf.length; i++) hex += buf[i].toString(16).padStart(2, "0");
   const wrapped = hex.match(/.{1,64}/g)!.join("\n");
   const eps = `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 ${size} ${size}
+%%BoundingBox: 0 0 ${w} ${h}
 %%EndComments
 gsave
 0 0 translate
-${size} ${size} scale
+${w} ${h} scale
 /DeviceRGB setcolorspace
 <<
   /ImageType 1
-  /Width ${size}
-  /Height ${size}
-  /ImageMatrix [${size} 0 0 -${size} 0 ${size}]
+  /Width ${w}
+  /Height ${h}
+  /ImageMatrix [${w} 0 0 -${h} 0 ${h}]
   /DataSource currentfile /ASCIIHexDecode filter /DCTDecode filter
   /BitsPerComponent 8
   /Decode [0 1 0 1 0 1]
@@ -531,6 +563,12 @@ function Index() {
   const [transparentImage, setTransparentImage] = useState<string | null>(null);
   const [mockups, setMockups] = useState<Mockup[]>([]);
   const [selectedMockups, setSelectedMockups] = useState<Set<string>>(new Set(DEFAULT_SELECTED));
+  const [typePref, setTypePref] = useLocal<{ id: ProductTypeId }>("etsyforge:productType", {
+    id: DEFAULT_PRODUCT_TYPE,
+  });
+  const productType = getProductType(typePref.id);
+  // The type the current single result was generated with (the picker may change afterwards).
+  const [resultType, setResultType] = useState<ProductTypeId>(DEFAULT_PRODUCT_TYPE);
   const [customMockups, setCustomMockups] = useState<string[]>([]);
   const [customMockupInput, setCustomMockupInput] = useState("");
   const [mockupPickerOpen, setMockupPickerOpen] = useState(false);
@@ -552,6 +590,11 @@ function Index() {
   // Cost confirmation dialog
   const [costEstimate, setCostEstimate] = useState<Estimate | null>(null);
   const [costOpen, setCostOpen] = useState(false);
+
+  // Each product type comes with its own sensible mockups.
+  useEffect(() => {
+    setSelectedMockups(new Set(getProductType(typePref.id).mockups));
+  }, [typePref.id]);
   const costResolveRef = useRef<((ok: boolean) => void) | null>(null);
   const skipCostRef = useRef(false);
 
@@ -604,6 +647,7 @@ function Index() {
         image: transparentImage ? await mockupInput(transparentImage) : transparentImage,
         mockup: m.id,
         tweak,
+        formats: getProductType(resultType).formats,
       };
       if (m.id.startsWith("custom:")) body.customPrompt = m.label;
       const r = await api<{ image: string }>("/api/generate-mockup", body);
@@ -788,6 +832,10 @@ function Index() {
     }
   }
 
+  /** Only cut-out types get a transparent PNG; full-bleed and printable pages keep their canvas. */
+  const prepareArt = (design: string, typeId: ProductTypeId) =>
+    getProductType(typeId).background === "transparent" ? cutOut(design) : Promise.resolve(design);
+
   /** Mockups only need a preview-sized copy of the 4K design as their input image. */
   const mockupInput = (transparent: string) =>
     reencodeB64(transparent, { maxSide: 1536 }).catch(() => transparent);
@@ -809,8 +857,13 @@ function Index() {
     totalVariations: number,
     onStage?: (stage: string) => void,
   ): Promise<ProductItem> {
+    const typeId = productType.id;
     onStage?.("Writing SEO listing…");
-    const seoRes = await api<SEO>("/api/generate-seo", { idea: keyword, shop });
+    const seoRes = await api<SEO>("/api/generate-seo", {
+      idea: keyword,
+      shop,
+      productType: typeId,
+    });
 
     const uniquenessClause: Record<typeof uniqueness, string> = {
       subtle:
@@ -828,12 +881,14 @@ function Index() {
     onStage?.("Generating artwork…");
     const imgRes = await apiWithRetry<{ image: string }>(
       "/api/generate-design",
-      { prompt: variationPrompt },
+      { prompt: variationPrompt, productType: typeId },
       2,
     );
     void checkNative4k(imgRes.image);
-    onStage?.("Removing background…");
-    const transparent = await cutOut(imgRes.image);
+    onStage?.(
+      productType.background === "transparent" ? "Removing background…" : "Preparing files…",
+    );
+    const transparent = await prepareArt(imgRes.image, typeId);
     const mockupSrc = await mockupInput(transparent);
     const toGen = allMockups.filter((m) => selectedMockups.has(m.id));
     const mockupsList: Mockup[] = [];
@@ -841,7 +896,11 @@ function Index() {
       const m = toGen[mi];
       onStage?.(`Mockup ${mi + 1}/${toGen.length}: ${m.label}…`);
       try {
-        const body: Record<string, unknown> = { image: mockupSrc, mockup: m.id };
+        const body: Record<string, unknown> = {
+          image: mockupSrc,
+          mockup: m.id,
+          formats: productType.formats,
+        };
         if (m.id.startsWith("custom:")) body.customPrompt = m.label;
         const r = await apiWithRetry<{ image: string }>("/api/generate-mockup", body, 2);
         mockupsList.push({ id: m.id, label: m.label, image: r.image });
@@ -854,6 +913,7 @@ function Index() {
       rawImage: imgRes.image,
       transparentImage: transparent,
       mockups: mockupsList,
+      productType: typeId,
     };
   }
 
@@ -889,22 +949,29 @@ function Index() {
       if (!isBatch) {
         setStep("Writing Etsy SEO listing…");
         setProgress(5);
-        const seoRes = await api<SEO>("/api/generate-seo", { idea: keywords[0], shop });
+        setResultType(productType.id);
+        const seoRes = await api<SEO>("/api/generate-seo", {
+          idea: keywords[0],
+          shop,
+          productType: productType.id,
+        });
         setSeo(seoRes);
         setProgress(15);
 
         setStep("Generating product artwork…");
         const imgRes = await apiWithRetry<{ image: string }>(
           "/api/generate-design",
-          { prompt: keywords[0] },
+          { prompt: keywords[0], productType: productType.id },
           2,
         );
         setRawImage(imgRes.image);
         void checkNative4k(imgRes.image);
         setProgress(35);
 
-        setStep("Removing background…");
-        const transparent = await cutOut(imgRes.image);
+        setStep(
+          productType.background === "transparent" ? "Removing background…" : "Preparing files…",
+        );
+        const transparent = await prepareArt(imgRes.image, productType.id);
         setTransparentImage(transparent);
         setProgress(50);
 
@@ -920,6 +987,7 @@ function Index() {
               const body: Record<string, unknown> = {
                 image: await mockupInput(transparent),
                 mockup: m.id,
+                formats: productType.formats,
               };
               if (m.id.startsWith("custom:")) body.customPrompt = m.label;
               const r = await apiWithRetry<{ image: string }>("/api/generate-mockup", body, 2);
@@ -996,7 +1064,42 @@ function Index() {
       JSON.stringify({ ...DEFAULT_EDITS, filename: "", include: true });
 
     const dir = folder.folder("design")!;
-    if (transparentEdits.include) {
+    const type = getProductType(item.productType);
+    if (type.background !== "transparent") {
+      // Full-bleed and printable-page products: the artwork itself is the file the buyer prints.
+      if (rawEdits.include) {
+        for (const r of allResolutions) {
+          if (rawEdited) {
+            dir.file(
+              `${safeFilename(rawEdits.filename || "design")}-${r.label}.jpg`,
+              await bakeEdits(pRaw, rawEdits, r.size, "image/jpeg", 0.98),
+            );
+          } else {
+            dir.file(`design-${r.label}.png`, await resizePng(pRaw, r.size, null));
+            dir.file(`design-${r.label}.jpg`, await resizeJpegHQ(pRaw, r.size, 0.98));
+          }
+        }
+        dir.file("design.pdf", await makePdf(pRaw, DEFAULT_EXPORT_SIZE));
+        if (type.background === "white") {
+          dir.file("print-us-letter.pdf", await makePagePdf(pRaw, "letter"));
+          dir.file("print-a4.pdf", await makePagePdf(pRaw, "a4"));
+        }
+        if (type.id === "digital-paper") {
+          // Scrapbook papers are sold as exact 12x12in sheets.
+          dir.file("digital-paper-12x12in.jpg", await resizeJpegHQ(pRaw, 12 * PRINT_DPI, 0.98));
+        }
+        if (type.vector) {
+          try {
+            const lines = await removeWhiteBackground(pRaw);
+            const vec = await traceVector(lines, DEFAULT_EXPORT_SIZE);
+            dir.file("design.svg", vec.svg);
+            dir.file("design.dxf", vec.dxf);
+          } catch (e) {
+            console.warn("vector trace failed", e);
+          }
+        }
+      }
+    } else if (transparentEdits.include) {
       for (const r of allResolutions) {
         if (transparentEdited) {
           dir.file(
@@ -1016,14 +1119,14 @@ function Index() {
         dir.file("design.dxf", vec.dxf);
       } catch (e) {
         console.warn("vector trace failed; exporting raster SVG", e);
-        dir.file("design.svg", makeSvg(pTrans, DEFAULT_EXPORT_SIZE));
+        dir.file("design.svg", await makeSvg(pTrans, DEFAULT_EXPORT_SIZE));
       }
       const pdfBlob = await makePdf(pTrans, DEFAULT_EXPORT_SIZE);
       dir.file("design.pdf", pdfBlob);
       dir.file("design.ai", pdfBlob);
       dir.file("design.eps", await makeEps(pTrans, DEFAULT_EXPORT_SIZE));
     }
-    if (rawEdits.include) {
+    if (type.background === "transparent" && rawEdits.include) {
       if (rawEdited) {
         dir.file(
           `${safeFilename(rawEdits.filename || "design-original")}.jpg`,
@@ -1075,7 +1178,13 @@ function Index() {
       } else if (hasSingle) {
         await bundleProduct(
           zip,
-          { seo: seo!, rawImage: rawImage!, transparentImage: transparentImage!, mockups },
+          {
+            seo: seo!,
+            rawImage: rawImage!,
+            transparentImage: transparentImage!,
+            mockups,
+            productType: resultType,
+          },
           { useEdits: true },
         );
       }
@@ -1359,152 +1468,6 @@ function Index() {
                         .
                       </p>
                     </div>
-
-                    <div className="border-t pt-4 space-y-3">
-                      <div>
-                        <Label htmlFor="kwprov">Keyword Research Provider</Label>
-                        <select
-                          id="kwprov"
-                          className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm h-9"
-                          value={draftSettings.kwProvider}
-                          onChange={(e) =>
-                            setDraftSettings({
-                              ...draftSettings,
-                              kwProvider: e.target.value as KwProvider,
-                            })
-                          }
-                        >
-                          <option value="semrush">
-                            Semrush (built-in connector — no key needed)
-                          </option>
-                          <option value="semrush_user">Semrush (your own API key)</option>
-                          <option value="ahrefs">Ahrefs (your own API key)</option>
-                          <option value="keywords_everywhere">
-                            Keywords Everywhere (your own API key)
-                          </option>
-                          <option value="erank">eRank (Etsy-focused, estimated)</option>
-                          <option value="alura">Alura (Etsy-focused, estimated)</option>
-                        </select>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Used by the{" "}
-                          <Link
-                            to="/keywords"
-                            className="underline"
-                            onClick={() => setSettingsOpen(false)}
-                          >
-                            Keyword Research
-                          </Link>{" "}
-                          page. eRank & Alura don't expose public APIs — selecting them uses a
-                          built-in Etsy keyword library with <em>estimated</em> volume/competition.
-                          Semrush / Ahrefs / Keywords Everywhere return real data via API.
-                        </p>
-                      </div>
-
-                      {draftSettings.kwProvider === "semrush_user" && (
-                        <div>
-                          <Label htmlFor="smk">Semrush API Key</Label>
-                          <Input
-                            id="smk"
-                            type="password"
-                            autoComplete="off"
-                            className="mt-1.5"
-                            placeholder="Your Semrush API key"
-                            value={draftSettings.semrushUserKey}
-                            onChange={(e) =>
-                              setDraftSettings({ ...draftSettings, semrushUserKey: e.target.value })
-                            }
-                          />
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Get from{" "}
-                            <a
-                              href="https://www.semrush.com/accounts/subscription-info/api-units/"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              Semrush API page
-                            </a>{" "}
-                            (requires Guru+ plan).
-                          </p>
-                        </div>
-                      )}
-                      {draftSettings.kwProvider === "ahrefs" && (
-                        <div>
-                          <Label htmlFor="ahk">Ahrefs API Token</Label>
-                          <Input
-                            id="ahk"
-                            type="password"
-                            autoComplete="off"
-                            className="mt-1.5"
-                            placeholder="Bearer token"
-                            value={draftSettings.ahrefsKey}
-                            onChange={(e) =>
-                              setDraftSettings({ ...draftSettings, ahrefsKey: e.target.value })
-                            }
-                          />
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Get from{" "}
-                            <a
-                              href="https://app.ahrefs.com/api"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              Ahrefs API
-                            </a>{" "}
-                            (API Access add-on required).
-                          </p>
-                        </div>
-                      )}
-                      {draftSettings.kwProvider === "keywords_everywhere" && (
-                        <div>
-                          <Label htmlFor="kek">Keywords Everywhere API Key</Label>
-                          <Input
-                            id="kek"
-                            type="password"
-                            autoComplete="off"
-                            className="mt-1.5"
-                            placeholder="Your KE API key"
-                            value={draftSettings.kwEverywhereKey}
-                            onChange={(e) =>
-                              setDraftSettings({
-                                ...draftSettings,
-                                kwEverywhereKey: e.target.value,
-                              })
-                            }
-                          />
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Pay-as-you-go credits. Get from{" "}
-                            <a
-                              href="https://keywordseverywhere.com/manage-api.html"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              keywordseverywhere.com
-                            </a>
-                            .
-                          </p>
-                        </div>
-                      )}
-                      {draftSettings.kwProvider === "semrush" && (
-                        <p className="text-xs text-muted-foreground">
-                          Uses the built-in Semrush connector. No API key needed here. If not
-                          connected yet, the Keyword Research page will show instructions.
-                        </p>
-                      )}
-                      {(draftSettings.kwProvider === "erank" ||
-                        draftSettings.kwProvider === "alura") && (
-                        <p className="text-xs text-muted-foreground">
-                          No API key required.{" "}
-                          {draftSettings.kwProvider === "erank" ? "eRank" : "Alura"} doesn't offer a
-                          public API, so we expand your seed against a curated Etsy keyword library.
-                          Numbers are <strong>estimates</strong> — use Semrush/Ahrefs for real
-                          metrics. For accurate eRank/Alura data, use their browser extension
-                          directly.
-                        </p>
-                      )}
-                    </div>
                   </div>
                   <DialogFooter className="gap-2">
                     <Button
@@ -1535,7 +1498,12 @@ function Index() {
         />
 
         {activeTab === "home" ? (
-          <LandingPage onStart={() => setActiveTab("product")} />
+          <LandingPage
+            onStart={(t) => {
+              if (t) setTypePref({ id: t });
+              setActiveTab("product");
+            }}
+          />
         ) : (
           <div className="flex flex-1 flex-col">
             <aside className={`w-full ${activeTab !== "product" ? "hidden" : ""}`}>
@@ -1549,8 +1517,8 @@ function Index() {
                       Describe your product
                     </h1>
                     <p className="mt-2 max-w-2xl text-muted-foreground">
-                      Get Etsy SEO copy, native 4K print-ready art (PNG, JPG, SVG, PDF, EPS, AI,
-                      DXF) and realistic mockups in one run.
+                      Pick an Etsy product type, then get SEO copy, native 4K print-ready files and
+                      realistic mockups in one run.
                     </p>
                   </div>
                   <a
@@ -1569,15 +1537,53 @@ function Index() {
                     <CardTitle>Describe your product</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4 p-6 sm:p-8">
+                    <fieldset>
+                      <legend className="text-sm font-medium">Product type</legend>
+                      <div
+                        role="radiogroup"
+                        className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                      >
+                        {PRODUCT_TYPES.map((t) => {
+                          const on = t.id === productType.id;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              disabled={busy}
+                              onClick={() => setTypePref({ id: t.id })}
+                              className={`rounded-xl border px-3.5 py-3 text-left transition-colors ${
+                                on
+                                  ? "border-primary bg-accent ring-1 ring-primary"
+                                  : "border-border bg-card hover:border-foreground/30"
+                              }`}
+                            >
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold">{t.label}</span>
+                                <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                  {t.aspectRatio}
+                                </span>
+                              </span>
+                              <span className="mt-1 block text-xs text-muted-foreground">
+                                {t.blurb}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Buyer gets: {productType.receives}.
+                      </p>
+                    </fieldset>
+
                     <div>
                       <Label htmlFor="idea">Product idea(s)</Label>
                       <Textarea
                         id="idea"
                         value={idea}
                         onChange={(e) => setIdea(e.target.value)}
-                        placeholder={
-                          "One product per line (max 10). e.g.\nMinimalist mountain sunrise line art\nBoho sun and moon tattoo flash\nVintage botanical herb chart"
-                        }
+                        placeholder={`One product per line (max 10). e.g.\n${productType.placeholder}`}
                         rows={5}
                         disabled={busy}
                         className="mt-1.5"
@@ -2099,23 +2105,28 @@ function Index() {
                       <CardContent className="grid gap-4 sm:grid-cols-2">
                         {rawImage && (
                           <ArtworkTile
-                            label="Original (with background)"
+                            label={
+                              getProductType(resultType).background === "transparent"
+                                ? "Original (with background)"
+                                : `${getProductType(resultType).label} (print file)`
+                            }
                             src={`data:image/png;base64,${rawImage}`}
                             excluded={!getEdits("main:raw", "design-original").include}
                             onEdit={() => setEditorOpen("main:raw")}
                             onStudio={() => openInStudio("main:raw", rawImage)}
                           />
                         )}
-                        {transparentImage && (
-                          <ArtworkTile
-                            label="Transparent"
-                            src={`data:image/png;base64,${transparentImage}`}
-                            transparentBg
-                            excluded={!getEdits("main:transparent", "design-transparent").include}
-                            onEdit={() => setEditorOpen("main:transparent")}
-                            onStudio={() => openInStudio("main:transparent", transparentImage)}
-                          />
-                        )}
+                        {transparentImage &&
+                          getProductType(resultType).background === "transparent" && (
+                            <ArtworkTile
+                              label="Transparent"
+                              src={`data:image/png;base64,${transparentImage}`}
+                              transparentBg
+                              excluded={!getEdits("main:transparent", "design-transparent").include}
+                              onEdit={() => setEditorOpen("main:transparent")}
+                              onStudio={() => openInStudio("main:transparent", transparentImage)}
+                            />
+                          )}
                       </CardContent>
                     </Card>
                   )}

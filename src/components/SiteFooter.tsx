@@ -35,9 +35,6 @@ export function SiteFooter() {
           <Link to="/adobe-stock" className="text-muted-foreground hover:text-foreground">
             Adobe Stock
           </Link>
-          <Link to="/keywords" className="text-muted-foreground hover:text-foreground">
-            Keywords
-          </Link>
         </nav>
       </div>
       <div className="border-t border-border">

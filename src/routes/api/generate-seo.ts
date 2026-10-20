@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { getProductType } from "@/lib/product-types";
 
 const BLOCKED = [
   "disney",
@@ -159,8 +160,13 @@ export const Route = createFileRoute("/api/generate-seo")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const body = (await request.json()) as { idea: string; shop?: Shop };
+          const body = (await request.json()) as {
+            idea: string;
+            shop?: Shop;
+            productType?: string;
+          };
           const { idea, shop = {} } = body;
+          const type = getProductType(body.productType);
           if (!idea || idea.trim().length < 3) {
             return Response.json({ error: "Please describe your product idea." }, { status: 400 });
           }
@@ -205,7 +211,7 @@ Do not include social links or copyright — the caller appends those. No HTML.`
               provider,
               key,
               system,
-              user: `Product idea: ${idea}`,
+              user: `Product idea: ${idea}\nProduct type: ${type.label}\nThe buyer receives: ${type.receives}.\nWrite the title, tags and "receive" list for this product type.`,
               json: true,
             });
           } catch (e) {

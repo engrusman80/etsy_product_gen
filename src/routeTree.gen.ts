@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdobeStockRouteImport } from './routes/adobe-stock'
 import { Route as EditorRouteImport } from './routes/editor'
-import { Route as KeywordsRouteImport } from './routes/keywords'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as ApiAdobeStockImageRouteImport } from './routes/api/adobe-stock-image'
@@ -24,7 +23,6 @@ import { Route as ApiCrochetSuggestRouteImport } from './routes/api/crochet-sugg
 import { Route as ApiGenerateDesignRouteImport } from './routes/api/generate-design'
 import { Route as ApiGenerateMockupRouteImport } from './routes/api/generate-mockup'
 import { Route as ApiGenerateSeoRouteImport } from './routes/api/generate-seo'
-import { Route as ApiKeywordsRouteImport } from './routes/api/keywords'
 import { Route as ApiRemoveBgRouteImport } from './routes/api/remove-bg'
 
 const IndexRoute = IndexRouteImport.update({
@@ -40,11 +38,6 @@ const AdobeStockRoute = AdobeStockRouteImport.update({
 const EditorRoute = EditorRouteImport.update({
   id: '/editor',
   path: '/editor',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KeywordsRoute = KeywordsRouteImport.update({
-  id: '/keywords',
-  path: '/keywords',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -103,11 +96,6 @@ const ApiGenerateSeoRoute = ApiGenerateSeoRouteImport.update({
   path: '/api/generate-seo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiKeywordsRoute = ApiKeywordsRouteImport.update({
-  id: '/api/keywords',
-  path: '/api/keywords',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiRemoveBgRoute = ApiRemoveBgRouteImport.update({
   id: '/api/remove-bg',
   path: '/api/remove-bg',
@@ -118,7 +106,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/adobe-stock': typeof AdobeStockRoute
   '/editor': typeof EditorRoute
-  '/keywords': typeof KeywordsRoute
   '/mcp': typeof McpRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/api/adobe-stock-image': typeof ApiAdobeStockImageRoute
@@ -130,14 +117,12 @@ export interface FileRoutesByFullPath {
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
-  '/api/keywords': typeof ApiKeywordsRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/adobe-stock': typeof AdobeStockRoute
   '/editor': typeof EditorRoute
-  '/keywords': typeof KeywordsRoute
   '/mcp': typeof McpRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/api/adobe-stock-image': typeof ApiAdobeStockImageRoute
@@ -149,7 +134,6 @@ export interface FileRoutesByTo {
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
-  '/api/keywords': typeof ApiKeywordsRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
 }
 export interface FileRoutesById {
@@ -157,7 +141,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/adobe-stock': typeof AdobeStockRoute
   '/editor': typeof EditorRoute
-  '/keywords': typeof KeywordsRoute
   '/mcp': typeof McpRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/api/adobe-stock-image': typeof ApiAdobeStockImageRoute
@@ -169,7 +152,6 @@ export interface FileRoutesById {
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
-  '/api/keywords': typeof ApiKeywordsRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
 }
 export interface FileRouteTypes {
@@ -178,7 +160,6 @@ export interface FileRouteTypes {
     | '/'
     | '/adobe-stock'
     | '/editor'
-    | '/keywords'
     | '/mcp'
     | '/.well-known/oauth-protected-resource'
     | '/api/adobe-stock-image'
@@ -190,14 +171,12 @@ export interface FileRouteTypes {
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
-    | '/api/keywords'
     | '/api/remove-bg'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/adobe-stock'
     | '/editor'
-    | '/keywords'
     | '/mcp'
     | '/.well-known/oauth-protected-resource'
     | '/api/adobe-stock-image'
@@ -209,14 +188,12 @@ export interface FileRouteTypes {
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
-    | '/api/keywords'
     | '/api/remove-bg'
   id:
     | '__root__'
     | '/'
     | '/adobe-stock'
     | '/editor'
-    | '/keywords'
     | '/mcp'
     | '/.well-known/oauth-protected-resource'
     | '/api/adobe-stock-image'
@@ -228,7 +205,6 @@ export interface FileRouteTypes {
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
-    | '/api/keywords'
     | '/api/remove-bg'
   fileRoutesById: FileRoutesById
 }
@@ -236,7 +212,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdobeStockRoute: typeof AdobeStockRoute
   EditorRoute: typeof EditorRoute
-  KeywordsRoute: typeof KeywordsRoute
   McpRoute: typeof McpRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiAdobeStockImageRoute: typeof ApiAdobeStockImageRoute
@@ -248,7 +223,6 @@ export interface RootRouteChildren {
   ApiGenerateDesignRoute: typeof ApiGenerateDesignRoute
   ApiGenerateMockupRoute: typeof ApiGenerateMockupRoute
   ApiGenerateSeoRoute: typeof ApiGenerateSeoRoute
-  ApiKeywordsRoute: typeof ApiKeywordsRoute
   ApiRemoveBgRoute: typeof ApiRemoveBgRoute
 }
 
@@ -273,13 +247,6 @@ declare module '@tanstack/react-router' {
       path: '/editor'
       fullPath: '/editor'
       preLoaderRoute: typeof EditorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/keywords': {
-      id: '/keywords'
-      path: '/keywords'
-      fullPath: '/keywords'
-      preLoaderRoute: typeof KeywordsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -359,13 +326,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGenerateSeoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/keywords': {
-      id: '/api/keywords'
-      path: '/api/keywords'
-      fullPath: '/api/keywords'
-      preLoaderRoute: typeof ApiKeywordsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/remove-bg': {
       id: '/api/remove-bg'
       path: '/api/remove-bg'
@@ -380,7 +340,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdobeStockRoute: AdobeStockRoute,
   EditorRoute: EditorRoute,
-  KeywordsRoute: KeywordsRoute,
   McpRoute: McpRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
@@ -393,7 +352,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateDesignRoute: ApiGenerateDesignRoute,
   ApiGenerateMockupRoute: ApiGenerateMockupRoute,
   ApiGenerateSeoRoute: ApiGenerateSeoRoute,
-  ApiKeywordsRoute: ApiKeywordsRoute,
   ApiRemoveBgRoute: ApiRemoveBgRoute,
 }
 export const routeTree = rootRouteImport
