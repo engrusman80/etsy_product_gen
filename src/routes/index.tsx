@@ -800,6 +800,15 @@ function Index() {
                   : "Switch provider in Settings.";
         throw new Error(`${providerLabel} credits exhausted — ${hint} (raw: ${rawMsg})`);
       }
+      if (
+        provider === "gemini" &&
+        /limit: 0|free_tier|FreeTier|free tier/i.test(rawMsg) &&
+        url !== "/api/generate-seo"
+      ) {
+        throw new Error(
+          "Your Gemini key is on the free tier, which does not include image generation. Turn on billing for the key at aistudio.google.com (Fast mode costs about $0.04 per design), or use “Upload my design” to make the files without AI images. SEO text works on the free key.",
+        );
+      }
       if (r.status === 429) {
         throw new Error(
           `${providerLabel} rate-limited (too many requests). Wait a moment and retry. (raw: ${rawMsg})`,
@@ -1421,7 +1430,14 @@ function Index() {
           onNavigate={setActiveTab}
           actions={
             <>
-              <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <Dialog
+                open={settingsOpen}
+                onOpenChange={(open) => {
+                  // Closing with X, Esc or a click outside keeps what was typed, like Save.
+                  if (!open) setSettings(draftSettings);
+                  setSettingsOpen(open);
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button
                     variant="ghost"
