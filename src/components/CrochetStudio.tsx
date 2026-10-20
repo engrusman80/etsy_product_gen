@@ -2,7 +2,8 @@
 // Generates: original pattern JSON + hero cover photo + 4 lifestyle mockups
 // + Etsy SEO (title/description/tags) + premium PDF, then bundles into a ZIP.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,20 +22,44 @@ import {
   Copy,
   Check,
   Package,
+  Store,
 } from "lucide-react";
+import { useSettings } from "@/lib/settings-store";
+import {
+  TAXONOMY_WORDS,
+  blobToB64,
+  etsyConnected,
+  markDaily,
+  saveEtsyDraft,
+  todayKey,
+  type DailyItem,
+} from "@/lib/etsy/client";
 import { CURATED_CROCHET_IDEAS, pickIdeas } from "@/lib/crochet/curated";
 import { buildCrochetPdf, patternHash } from "@/lib/crochet/pdf";
 import type { CrochetPattern } from "@/lib/crochet/types";
 
 type ApiFn = <T>(url: string, body: unknown) => Promise<T>;
 
-type Props = { apiCall: ApiFn; shopName?: string; shop?: Record<string, string> };
+type Props = {
+  apiCall: ApiFn;
+  shopName?: string;
+  shop?: Record<string, string>;
+  /** Today's queued crochet idea from the Etsy page. */
+  daily?: DailyItem | null;
+};
 
 const HISTORY_KEY = "crochet:history";
 const MAX_HISTORY = 200;
 
 type SEO = { title: string; description: string; tags: string[] };
 type MockupOut = { id: string; label: string; image: string };
+type Result = {
+  pattern: CrochetPattern;
+  hero: string | null;
+  mockups: MockupOut[];
+  seo: SEO | null;
+  pdf: Blob;
+};
 
 const MOCKUP_PLAN: { id: string; label: string; filename: string }[] = [
   { id: "crochet-cover", label: "Text-overlay cover", filename: "01-cover.jpg" },
@@ -128,7 +153,11 @@ function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 }
 
-export function CrochetStudio({ apiCall, shopName, shop }: Props) {
+export function CrochetStudio({ apiCall, shopName, shop, daily }: Props) {
+  const [settings] = useSettings();
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftUrl, setDraftUrl] = useState<string | null>(null);
+  const lastResult = useRef<Result | null>(null);
   const [idea, setIdea] = useState("");
   const [terminology, setTerminology] = useState<"US" | "UK">("US");
   // Shuffle after mount: a random pick during render differs between server and client HTML.
@@ -184,11 +213,14 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
     setTimeout(() => setCopied(null), 1500);
   }
 
-  async function generate() {
-    if (!idea.trim()) {
+  async function generate(overrideIdea?: string): Promise<Result | null> {
+    const ideaText = overrideIdea ?? idea;
+    if (!ideaText.trim()) {
       setErr("Please enter or pick a pattern idea.");
-      return;
+      return null;
     }
+    setDraftUrl(null);
+    let out: Result | null = null;
     setBusy(true);
     setErr(null);
     setPattern(null);
@@ -214,7 +246,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
         const r = await apiCall<{ pattern: CrochetPattern; warnings?: string[] }>(
           "/api/crochet-pattern",
           {
-            idea,
+            idea: ideaText,
             seed,
             terminology,
             avoidTitles: historyRef.titles.slice(-30),
@@ -253,6 +285,8 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
         console.warn("Hero image failed:", (e as Error).message);
       }
 
+      let seoOut: SEO | null = null;
+      let mockOut: MockupOut[] = [];
       // 3) SEO (title, description, tags)
       setStep("Writing Etsy title, description & tags…");
       try {
@@ -263,6 +297,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
         };
         const s = await apiCall<SEO>("/api/generate-seo", seoBody);
         setSeo(s);
+        seoOut = s;
       } catch (e) {
         console.warn("SEO failed:", (e as Error).message);
       }
@@ -289,6 +324,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
         });
         const results = (await Promise.all(tasks)).filter(Boolean) as MockupOut[];
         setMockups(results);
+        mockOut = results;
       }
 
       // 5) Save history
@@ -300,6 +336,8 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
       setStep("Building premium PDF…");
       const pdfBlob = await buildCrochetPdf(p, heroB64, shopName);
       setPdfUrl(URL.createObjectURL(pdfBlob));
+      out = { pattern: p, hero: heroB64, mockups: mockOut, seo: seoOut, pdf: pdfBlob };
+      lastResult.current = out;
 
       setStep("");
     } catch (e) {
@@ -307,7 +345,68 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
     } finally {
       setBusy(false);
     }
+    return out;
   }
+
+  /** Saves the pattern to Etsy as an inactive draft: photos, PDF, title, tags, description. */
+  async function saveDraft(r: Result, seoNow: SEO | null) {
+    const listing = seoNow ?? r.seo;
+    if (!listing) throw new Error("The Etsy title and tags were not written; generate again.");
+    const photos = [...r.mockups.map((m) => m.image), ...(r.hero ? [r.hero] : [])];
+    const images: string[] = [];
+    for (const ph of photos.slice(0, 10))
+      images.push(await blobToB64(await resampleToBlob(ph, 2000, "jpg")));
+    return saveEtsyDraft({
+      title: listing.title,
+      description: listing.description,
+      tags: listing.tags,
+      price: settings.etsyPricePattern,
+      taxonomyWords: TAXONOMY_WORDS.crochet,
+      images,
+      files: [{ name: `${slug(r.pattern.title)}.pdf`, blob: r.pdf }],
+    });
+  }
+
+  async function saveDraftClick() {
+    if (!lastResult.current) return;
+    setDraftBusy(true);
+    try {
+      const d = await saveDraft(lastResult.current, seo);
+      setDraftUrl(d.editUrl);
+      toast.success(`Saved to Etsy as a draft (category: ${d.category}).`);
+      if (d.problems.length) toast.warning(d.problems.join("\n"));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  // Today's queued crochet idea from the Etsy page.
+  const dailyStarted = useRef(false);
+  useEffect(() => {
+    if (!daily || dailyStarted.current) return;
+    dailyStarted.current = true;
+    setIdea(daily.idea);
+    void (async () => {
+      toast.info(`Making today's Etsy draft: ${daily.idea}`);
+      const r = await generate(daily.idea);
+      if (!r) {
+        markDaily(daily.id, { error: "pattern generation failed" });
+        return;
+      }
+      try {
+        const d = await saveDraft(r, r.seo);
+        setDraftUrl(d.editUrl);
+        markDaily(daily.id, { doneAt: todayKey(), listingId: d.listingId, editUrl: d.editUrl });
+        toast.success("Today's crochet draft is saved on Etsy.");
+      } catch (e) {
+        markDaily(daily.id, { error: (e as Error).message.slice(0, 160) });
+        toast.error((e as Error).message);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [daily]);
 
   // Rebuild PDF if hero arrives after pattern (race safety)
   useEffect(() => {
@@ -597,7 +696,7 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={generate} disabled={busy || !idea.trim()}>
+          <Button onClick={() => void generate()} disabled={busy || !idea.trim()}>
             {busy ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -611,6 +710,26 @@ export function CrochetStudio({ apiCall, shopName, shop }: Props) {
                 <Download className="mr-2 h-4 w-4" /> PDF only
               </a>
             </Button>
+          )}
+          {pattern && pdfUrl && etsyConnected(settings) && (
+            <Button variant="outline" onClick={saveDraftClick} disabled={busy || draftBusy}>
+              {draftBusy ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Store className="mr-2 h-4 w-4" />
+              )}
+              Save as Etsy draft
+            </Button>
+          )}
+          {draftUrl && (
+            <a
+              href={draftUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="self-center text-sm underline"
+            >
+              Open the draft on Etsy
+            </a>
           )}
           {pattern && (
             <Button

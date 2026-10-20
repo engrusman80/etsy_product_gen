@@ -22,10 +22,14 @@ import { Route as ApiAdobeStockVideoRouteImport } from './routes/api/adobe-stock
 import { Route as ApiCheckKeyRouteImport } from './routes/api/check-key'
 import { Route as ApiCrochetPatternRouteImport } from './routes/api/crochet-pattern'
 import { Route as ApiCrochetSuggestRouteImport } from './routes/api/crochet-suggest'
+import { Route as ApiEtsyRouteImport } from './routes/api/etsy'
 import { Route as ApiGenerateDesignRouteImport } from './routes/api/generate-design'
 import { Route as ApiGenerateMockupRouteImport } from './routes/api/generate-mockup'
 import { Route as ApiGenerateSeoRouteImport } from './routes/api/generate-seo'
 import { Route as ApiRemoveBgRouteImport } from './routes/api/remove-bg'
+import { Route as EtsyIndexRouteImport } from './routes/etsy.index'
+import { Route as EtsyCallbackRouteImport } from './routes/etsy.callback'
+import { Route as ApiEtsyCallbackRouteImport } from './routes/api/etsy.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -93,6 +97,11 @@ const ApiCrochetSuggestRoute = ApiCrochetSuggestRouteImport.update({
   path: '/api/crochet-suggest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEtsyRoute = ApiEtsyRouteImport.update({
+  id: '/api/etsy',
+  path: '/api/etsy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGenerateDesignRoute = ApiGenerateDesignRouteImport.update({
   id: '/api/generate-design',
   path: '/api/generate-design',
@@ -113,6 +122,21 @@ const ApiRemoveBgRoute = ApiRemoveBgRouteImport.update({
   path: '/api/remove-bg',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EtsyIndexRoute = EtsyIndexRouteImport.update({
+  id: '/etsy/',
+  path: '/etsy/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EtsyCallbackRoute = EtsyCallbackRouteImport.update({
+  id: '/etsy/callback',
+  path: '/etsy/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEtsyCallbackRoute = ApiEtsyCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => ApiEtsyRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -128,10 +152,14 @@ export interface FileRoutesByFullPath {
   '/api/check-key': typeof ApiCheckKeyRoute
   '/api/crochet-pattern': typeof ApiCrochetPatternRoute
   '/api/crochet-suggest': typeof ApiCrochetSuggestRoute
+  '/api/etsy': typeof ApiEtsyRouteWithChildren
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
+  '/etsy/callback': typeof EtsyCallbackRoute
+  '/etsy/': typeof EtsyIndexRoute
+  '/api/etsy/callback': typeof ApiEtsyCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,10 +175,14 @@ export interface FileRoutesByTo {
   '/api/check-key': typeof ApiCheckKeyRoute
   '/api/crochet-pattern': typeof ApiCrochetPatternRoute
   '/api/crochet-suggest': typeof ApiCrochetSuggestRoute
+  '/api/etsy': typeof ApiEtsyRouteWithChildren
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
+  '/etsy/callback': typeof EtsyCallbackRoute
+  '/etsy': typeof EtsyIndexRoute
+  '/api/etsy/callback': typeof ApiEtsyCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,10 +199,14 @@ export interface FileRoutesById {
   '/api/check-key': typeof ApiCheckKeyRoute
   '/api/crochet-pattern': typeof ApiCrochetPatternRoute
   '/api/crochet-suggest': typeof ApiCrochetSuggestRoute
+  '/api/etsy': typeof ApiEtsyRouteWithChildren
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
+  '/etsy/callback': typeof EtsyCallbackRoute
+  '/etsy/': typeof EtsyIndexRoute
+  '/api/etsy/callback': typeof ApiEtsyCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -188,10 +224,14 @@ export interface FileRouteTypes {
     | '/api/check-key'
     | '/api/crochet-pattern'
     | '/api/crochet-suggest'
+    | '/api/etsy'
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
     | '/api/remove-bg'
+    | '/etsy/callback'
+    | '/etsy/'
+    | '/api/etsy/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -207,10 +247,14 @@ export interface FileRouteTypes {
     | '/api/check-key'
     | '/api/crochet-pattern'
     | '/api/crochet-suggest'
+    | '/api/etsy'
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
     | '/api/remove-bg'
+    | '/etsy/callback'
+    | '/etsy'
+    | '/api/etsy/callback'
   id:
     | '__root__'
     | '/'
@@ -226,10 +270,14 @@ export interface FileRouteTypes {
     | '/api/check-key'
     | '/api/crochet-pattern'
     | '/api/crochet-suggest'
+    | '/api/etsy'
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
     | '/api/remove-bg'
+    | '/etsy/callback'
+    | '/etsy/'
+    | '/api/etsy/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -246,10 +294,13 @@ export interface RootRouteChildren {
   ApiCheckKeyRoute: typeof ApiCheckKeyRoute
   ApiCrochetPatternRoute: typeof ApiCrochetPatternRoute
   ApiCrochetSuggestRoute: typeof ApiCrochetSuggestRoute
+  ApiEtsyRoute: typeof ApiEtsyRouteWithChildren
   ApiGenerateDesignRoute: typeof ApiGenerateDesignRoute
   ApiGenerateMockupRoute: typeof ApiGenerateMockupRoute
   ApiGenerateSeoRoute: typeof ApiGenerateSeoRoute
   ApiRemoveBgRoute: typeof ApiRemoveBgRoute
+  EtsyCallbackRoute: typeof EtsyCallbackRoute
+  EtsyIndexRoute: typeof EtsyIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -345,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCrochetSuggestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/etsy': {
+      id: '/api/etsy'
+      path: '/api/etsy'
+      fullPath: '/api/etsy'
+      preLoaderRoute: typeof ApiEtsyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/generate-design': {
       id: '/api/generate-design'
       path: '/api/generate-design'
@@ -373,8 +431,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRemoveBgRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/etsy/': {
+      id: '/etsy/'
+      path: '/etsy'
+      fullPath: '/etsy/'
+      preLoaderRoute: typeof EtsyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/etsy/callback': {
+      id: '/etsy/callback'
+      path: '/etsy/callback'
+      fullPath: '/etsy/callback'
+      preLoaderRoute: typeof EtsyCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/etsy/callback': {
+      id: '/api/etsy/callback'
+      path: '/callback'
+      fullPath: '/api/etsy/callback'
+      preLoaderRoute: typeof ApiEtsyCallbackRouteImport
+      parentRoute: typeof ApiEtsyRoute
+    }
   }
 }
+
+interface ApiEtsyRouteChildren {
+  ApiEtsyCallbackRoute: typeof ApiEtsyCallbackRoute
+}
+
+const ApiEtsyRouteChildren: ApiEtsyRouteChildren = {
+  ApiEtsyCallbackRoute: ApiEtsyCallbackRoute,
+}
+
+const ApiEtsyRouteWithChildren =
+  ApiEtsyRoute._addFileChildren(ApiEtsyRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -391,10 +481,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCheckKeyRoute: ApiCheckKeyRoute,
   ApiCrochetPatternRoute: ApiCrochetPatternRoute,
   ApiCrochetSuggestRoute: ApiCrochetSuggestRoute,
+  ApiEtsyRoute: ApiEtsyRouteWithChildren,
   ApiGenerateDesignRoute: ApiGenerateDesignRoute,
   ApiGenerateMockupRoute: ApiGenerateMockupRoute,
   ApiGenerateSeoRoute: ApiGenerateSeoRoute,
   ApiRemoveBgRoute: ApiRemoveBgRoute,
+  EtsyCallbackRoute: EtsyCallbackRoute,
+  EtsyIndexRoute: EtsyIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

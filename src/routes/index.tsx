@@ -8,6 +8,7 @@ import {
   Sparkles,
   Download,
   Loader2,
+  Store,
   Wand2,
   Copy,
   Check,
@@ -62,6 +63,23 @@ import {
 } from "@/lib/print-export";
 import { activeProvider, hasAiKey, keyFor, useSettings } from "@/lib/settings-store";
 import {
+  ETSY_FILE_MAX,
+  TAXONOMY_WORDS,
+  blobToB64,
+  dueDailyItem,
+  etsyCall,
+  etsyConnected,
+  loadQueue,
+  markDaily,
+  saveEtsyDraft,
+  shopCheckDue,
+  storeShopCheck,
+  todayKey,
+  type DailyItem,
+  type DraftResult,
+} from "@/lib/etsy/client";
+import { checkShop, type ListingLike } from "@/lib/etsy/check";
+import {
   DEFAULT_PRODUCT_TYPE,
   PRODUCT_TYPES,
   getProductType,
@@ -79,8 +97,11 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>): { tab?: "product" | "crochet" } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { tab?: "product" | "crochet"; daily?: string } => ({
     tab: s.tab === "product" || s.tab === "crochet" ? s.tab : undefined,
+    daily: typeof s.daily === "string" ? s.daily : undefined,
   }),
   component: Index,
 });
@@ -985,11 +1006,17 @@ function Index() {
     }
   }
 
-  async function generate() {
-    if (!idea.trim()) return;
-    const keywords = parseKeywords(idea);
-    if (keywords.length === 0) return;
-    const vCount = Math.max(1, Math.min(5, variations));
+  /** Returns the finished single product (used by the daily Etsy draft), or null. */
+  async function generate(override?: {
+    idea: string;
+    type: ProductTypeId;
+  }): Promise<ProductItem | null> {
+    const productType = getProductType(override ? override.type : typePref.id);
+    const ideaText = override?.idea ?? idea;
+    if (!ideaText.trim()) return null;
+    const keywords = parseKeywords(ideaText);
+    if (keywords.length === 0) return null;
+    const vCount = override ? 1 : Math.max(1, Math.min(5, variations));
     const isBatch = keywords.length > 1 || vCount > 1;
 
     const mockupsCount = allMockups.filter((m) => selectedMockups.has(m.id)).length;
@@ -1001,8 +1028,9 @@ function Index() {
       useRemoveBgApi: Boolean(settings.removeBgKey),
       fastImage: settings.imageQuality === "fast",
     });
-    if (!ok) return;
+    if (!ok) return null;
 
+    let single: ProductItem | null = null;
     setBusy(true);
     setErr(null);
     setSeo(null);
@@ -1048,7 +1076,8 @@ function Index() {
         setTransparentImage(transparent);
         setProgress(50);
 
-        const toGen = allMockups.filter((m) => selectedMockups.has(m.id));
+        const wanted = override ? new Set(productType.mockups) : selectedMockups;
+        const toGen = allMockups.filter((m) => wanted.has(m.id));
         if (toGen.length === 0) {
           setStep("Done! (no mockups selected)");
         } else {
@@ -1072,7 +1101,21 @@ function Index() {
             setProgress(50 + Math.round(((i + 1) / toGen.length) * 50));
           }
           setStep("Done!");
+          single = {
+            seo: seoRes,
+            rawImage: imgRes.image,
+            transparentImage: transparent,
+            mockups: done,
+            productType: productType.id,
+          };
         }
+        single ??= {
+          seo: seoRes,
+          rawImage: imgRes.image,
+          transparentImage: transparent,
+          mockups: [],
+          productType: productType.id,
+        };
       } else {
         const total = keywords.length * vCount;
         let stepIdx = 0;
@@ -1115,6 +1158,7 @@ function Index() {
     } finally {
       setBusy(false);
     }
+    return single;
   }
 
   async function bundleProduct(folder: JSZip, item: ProductItem, opts: { useEdits: boolean }) {
@@ -1223,6 +1267,129 @@ function Index() {
       if (!e.include) continue;
       const jpg = await bakeEdits(m.image, e, DEFAULT_EXPORT_SIZE, "image/jpeg", 0.98);
       mdir.file(`${safeFilename(e.filename || m.id)}.jpg`, jpg);
+    }
+  }
+
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftResult, setDraftResult] = useState<DraftResult | null>(null);
+  const [crochetDaily, setCrochetDaily] = useState<DailyItem | null>(null);
+  const [dueDaily, setDueDaily] = useState<DailyItem | null>(null);
+
+  /** Saves one product to Etsy as an inactive draft. Never publishes. */
+  async function saveProductDraft(item: ProductItem, useEdits: boolean): Promise<DraftResult> {
+    const zip = new JSZip();
+    await bundleProduct(zip, item, { useEdits });
+    // The buyer's download holds only the design files; listing text and mockups stay out.
+    zip.remove("listing.txt");
+    zip.remove("listing.json");
+    zip.remove("mockups");
+    const files: { name: string; blob: Blob }[] = [];
+    const whole = await zip.generateAsync({ type: "blob" });
+    const base = slugify(item.seo.title).slice(0, 50) || "design";
+    if (whole.size <= ETSY_FILE_MAX) files.push({ name: `${base}.zip`, blob: whole });
+    else {
+      // Etsy takes 5 files of up to 20 MB each, so send the most useful formats on their own.
+      const rank = (n: string) =>
+        [".svg", ".pdf", ".png", ".dxf", ".jpg", ".eps"].findIndex((e) => n.endsWith(e));
+      const entries = Object.values(zip.files)
+        .filter((f) => !f.dir && rank(f.name) >= 0)
+        .sort((a, b) => rank(a.name) - rank(b.name));
+      for (const f of entries) {
+        if (files.length >= 5) break;
+        const blob = await f.async("blob");
+        if (blob.size <= ETSY_FILE_MAX) files.push({ name: f.name.split("/").pop()!, blob });
+      }
+    }
+    const photos = [...item.mockups.map((m) => m.image), item.rawImage];
+    const images: string[] = [];
+    for (const ph of photos.slice(0, 10))
+      images.push(await blobToB64(await resizeJpegHQ(ph, 2000, 0.9)));
+    return saveEtsyDraft({
+      title: item.seo.title,
+      description: item.seo.description,
+      tags: item.seo.tags,
+      price: settings.etsyPriceDigital,
+      taxonomyWords: TAXONOMY_WORDS[item.productType] ?? ["digital"],
+      images,
+      files,
+    });
+  }
+
+  async function saveDraftClick() {
+    if (!seo || !rawImage || !transparentImage) return;
+    setDraftBusy(true);
+    try {
+      const d = await saveProductDraft(
+        { seo, rawImage, transparentImage, mockups, productType: resultType },
+        true,
+      );
+      setDraftResult(d);
+      toast.success(`Saved to Etsy as a draft (category: ${d.category}).`);
+      if (d.problems.length) toast.warning(d.problems.join("\n"));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  // Once a day: check the shop quietly, and make the next queued product as an Etsy draft.
+  const dailyStarted = useRef(false);
+  useEffect(() => {
+    if (dailyStarted.current || !etsyConnected(settings)) return;
+    dailyStarted.current = true;
+
+    if (shopCheckDue())
+      void etsyCall<{ listings: ListingLike[] }>({ action: "listings" })
+        .then(({ listings }) => {
+          const flagged = checkShop(listings, settings.etsyShopName).length;
+          storeShopCheck({ at: todayKey(), total: listings.length, flagged });
+          if (flagged)
+            toast.warning(`Shop check: ${flagged} of ${listings.length} listings need attention.`, {
+              action: { label: "Open", onClick: () => (window.location.href = "/etsy") },
+            });
+        })
+        .catch((e: Error) => console.warn("shop check failed", e.message));
+
+    const picked = search.daily
+      ? (loadQueue().find((i) => i.id === search.daily && !i.doneAt) ?? null)
+      : dueDailyItem();
+    if (!picked) return;
+    if (!search.daily && !settings.dailyAuto) {
+      setDueDaily(picked);
+      return;
+    }
+    void runDaily(picked, !search.daily);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.etsyShopId, search.daily]);
+
+  async function runDaily(item: DailyItem, auto: boolean) {
+    setDueDaily(null);
+    if (item.kind === "crochet") {
+      setActiveTab("crochet");
+      setCrochetDaily(item);
+      return;
+    }
+    const type = getProductType(item.kind).id;
+    setActiveTab("product");
+    setTypePref({ id: type });
+    setIdea(item.idea);
+    toast.info(`Making today's Etsy draft: ${item.idea}`);
+    skipCostRef.current = auto;
+    const result = await generate({ idea: item.idea, type });
+    skipCostRef.current = false;
+    if (!result) {
+      markDaily(item.id, { error: "generation failed or was cancelled" });
+      return;
+    }
+    try {
+      const d = await saveProductDraft(result, false);
+      setDraftResult(d);
+      markDaily(item.id, { doneAt: todayKey(), listingId: d.listingId, editUrl: d.editUrl });
+      toast.success("Today's draft is saved on Etsy.");
+    } catch (e) {
+      markDaily(item.id, { error: (e as Error).message.slice(0, 160) });
+      toast.error((e as Error).message);
     }
   }
 
@@ -1808,7 +1975,7 @@ function Index() {
                     </Collapsible>
 
                     <Button
-                      onClick={generate}
+                      onClick={() => void generate()}
                       disabled={busy || !idea.trim()}
                       size="lg"
                       className="h-12 rounded-full px-8 text-base glow-primary"
@@ -1881,6 +2048,7 @@ function Index() {
               <div className="mx-auto w-full max-w-7xl space-y-6 p-6 lg:p-8">
                 <div className={activeTab !== "crochet" ? "hidden" : "block"}>
                   <CrochetStudio
+                    daily={crochetDaily}
                     apiCall={api}
                     shopName={shop.shopName}
                     shop={shop as unknown as Record<string, string>}
@@ -1888,6 +2056,36 @@ function Index() {
                 </div>
 
                 <div className={activeTab !== "product" ? "hidden" : "block space-y-6"}>
+                  {dueDaily && !busy && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-accent p-4 text-sm">
+                      <span>
+                        Today&apos;s Etsy draft: <strong>{dueDaily.idea}</strong>
+                      </span>
+                      <Button size="sm" onClick={() => void runDaily(dueDaily, false)}>
+                        Make today&apos;s draft
+                      </Button>
+                    </div>
+                  )}
+                  {draftResult && (
+                    <div className="rounded-lg border border-sage/50 bg-card p-4 text-sm">
+                      Saved to Etsy as a draft in “{draftResult.category}”.{" "}
+                      <a
+                        href={draftResult.editUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        Review and publish it on Etsy
+                      </a>
+                      {draftResult.problems.length > 0 && (
+                        <ul className="mt-2 list-disc pl-5 text-destructive">
+                          {draftResult.problems.map((p) => (
+                            <li key={p}>{p}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                   {seo && (
                     <Card className="mt-6">
                       <CardHeader>
@@ -2302,7 +2500,23 @@ function Index() {
                   )}
 
                   {((seo && transparentImage) || isBatchComplete(batch)) && !busy && (
-                    <div className="sticky bottom-4 mt-6 flex justify-end">
+                    <div className="sticky bottom-4 mt-6 flex justify-end gap-2">
+                      {seo && transparentImage && !batch && etsyConnected(settings) && (
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={saveDraftClick}
+                          disabled={draftBusy}
+                          className="bg-background shadow-lg"
+                        >
+                          {draftBusy ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Store className="h-4 w-4" />
+                          )}
+                          Save as Etsy draft
+                        </Button>
+                      )}
                       <Button size="lg" onClick={downloadZip} className="shadow-lg">
                         <Download className="h-4 w-4" /> Download ZIP
                         {batch

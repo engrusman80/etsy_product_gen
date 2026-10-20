@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Eye, EyeOff, KeyRound, Loader2, ShieldCheck, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -16,7 +16,8 @@ import {
   type AdobeProvider,
   type Settings,
 } from "@/lib/settings-store";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Store, Sun } from "lucide-react";
+import { etsyConnected, startEtsyConnect } from "@/lib/etsy/client";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings · Digital Product AI Automation" }] }),
@@ -184,6 +185,13 @@ function SettingsPage() {
         </Panel>
 
         <Panel
+          title="Etsy shop"
+          desc="Lets the app check your listings and save new products to Etsy as drafts. It never publishes anything."
+        >
+          <EtsyConnect settings={settings} update={update} />
+        </Panel>
+
+        <Panel
           title="Adobe Stock Studio"
           desc="Which image provider Adobe Stock uses. It reads the keys above."
         >
@@ -330,6 +338,101 @@ function KeyRow({
           {msg}
         </p>
       )}
+    </div>
+  );
+}
+
+function EtsyConnect({
+  settings,
+  update,
+}: {
+  settings: Settings;
+  update: (patch: Partial<Settings>) => void;
+}) {
+  const [origin, setOrigin] = useState("http://localhost:8080");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const connected = etsyConnected(settings);
+  const ready = !!(settings.etsyKeystring && settings.etsySecret);
+
+  return (
+    <div className="space-y-4 text-sm">
+      <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+        <li>
+          Create an app at{" "}
+          <a
+            href="https://www.etsy.com/developers/register"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            etsy.com/developers/register
+          </a>
+          .
+        </li>
+        <li>
+          Set its callback URL to the one picked here (both work, they must just match):
+          <select
+            className="mt-1 block w-full rounded-md border border-input bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+            value={settings.etsyCallbackApi ? "api" : "page"}
+            onChange={(e) => update({ etsyCallbackApi: e.target.value === "api" })}
+            aria-label="Etsy callback URL"
+          >
+            <option value="page">{origin}/etsy/callback</option>
+            <option value="api">{origin}/api/etsy/callback</option>
+          </select>
+        </li>
+        <li>Paste the Keystring and Shared secret below, then press Connect Etsy.</li>
+      </ol>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="etsy-key">Keystring</Label>
+          <Input
+            id="etsy-key"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            className="mt-1 font-mono"
+            value={settings.etsyKeystring}
+            onChange={(e) => update({ etsyKeystring: e.target.value.trim() })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="etsy-secret">Shared secret</Label>
+          <Input
+            id="etsy-secret"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            className="mt-1 font-mono"
+            value={settings.etsySecret}
+            onChange={(e) => update({ etsySecret: e.target.value.trim() })}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => startEtsyConnect(settings)} disabled={!ready}>
+          <Store className="h-4 w-4" /> {connected ? "Reconnect Etsy" : "Connect Etsy"}
+        </Button>
+        {connected && (
+          <>
+            <span className="text-sage">Connected to {settings.etsyShopName}</span>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                update({
+                  etsyAccess: "",
+                  etsyRefresh: "",
+                  etsyExpiresAt: 0,
+                  etsyShopId: 0,
+                  etsyShopName: "",
+                })
+              }
+            >
+              Disconnect
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

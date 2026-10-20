@@ -21,6 +21,22 @@ export type Settings = {
   imageQuality: "4k" | "fast";
   /** Image provider for Adobe Stock Studio. */
   adobeProvider: AdobeProvider;
+  /** The user's own Etsy developer app (etsy.com/developers). */
+  etsyKeystring: string;
+  etsySecret: string;
+  /** The Etsy app's callback is /api/etsy/callback instead of /etsy/callback. */
+  etsyCallbackApi: boolean;
+  /** OAuth tokens from "Connect Etsy"; the access token lasts 1 hour, the refresh token 90 days. */
+  etsyAccess: string;
+  etsyRefresh: string;
+  etsyExpiresAt: number;
+  etsyShopId: number;
+  etsyShopName: string;
+  /** Draft prices in USD. */
+  etsyPriceDigital: number;
+  etsyPricePattern: number;
+  /** Make the next queued daily product by itself when the app opens (skips the cost prompt). */
+  dailyAuto: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -30,6 +46,17 @@ export const DEFAULT_SETTINGS: Settings = {
   removeBgKey: "",
   imageQuality: "4k",
   adobeProvider: "gemini",
+  etsyKeystring: "",
+  etsySecret: "",
+  etsyCallbackApi: false,
+  etsyAccess: "",
+  etsyRefresh: "",
+  etsyExpiresAt: 0,
+  etsyShopId: 0,
+  etsyShopName: "",
+  etsyPriceDigital: 2.99,
+  etsyPricePattern: 4.99,
+  dailyAuto: false,
 };
 
 const isProvider = (v: unknown): v is AIProvider => v === "gemini" || v === "openrouter";
@@ -37,6 +64,7 @@ const isProvider = (v: unknown): v is AIProvider => v === "gemini" || v === "ope
 /** Keep only known fields, so keys for removed providers are dropped from storage. */
 function clean(raw: Partial<Record<keyof Settings, unknown>>): Settings {
   const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
   return {
     aiProvider: isProvider(raw.aiProvider) ? raw.aiProvider : "gemini",
     geminiKey: str(raw.geminiKey),
@@ -44,6 +72,17 @@ function clean(raw: Partial<Record<keyof Settings, unknown>>): Settings {
     removeBgKey: str(raw.removeBgKey),
     imageQuality: raw.imageQuality === "fast" ? "fast" : "4k",
     adobeProvider: isProvider(raw.adobeProvider) ? raw.adobeProvider : "gemini",
+    etsyKeystring: str(raw.etsyKeystring),
+    etsySecret: str(raw.etsySecret),
+    etsyCallbackApi: raw.etsyCallbackApi === true,
+    etsyAccess: str(raw.etsyAccess),
+    etsyRefresh: str(raw.etsyRefresh),
+    etsyExpiresAt: num(raw.etsyExpiresAt, 0),
+    etsyShopId: num(raw.etsyShopId, 0),
+    etsyShopName: str(raw.etsyShopName),
+    etsyPriceDigital: num(raw.etsyPriceDigital, DEFAULT_SETTINGS.etsyPriceDigital),
+    etsyPricePattern: num(raw.etsyPricePattern, DEFAULT_SETTINGS.etsyPricePattern),
+    dailyAuto: raw.dailyAuto === true,
   };
 }
 
