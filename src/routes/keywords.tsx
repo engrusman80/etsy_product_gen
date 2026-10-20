@@ -180,8 +180,8 @@ function KeywordsPage() {
         note: j.note,
       });
       setProvider(s.kwProvider);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -207,10 +207,12 @@ function KeywordsPage() {
     return out;
   }, [rows, filter, minVol, maxKd, maxComp, sortBy]);
 
-  function useKeyword(k: string) {
+  function pickKeyword(k: string) {
     try {
       localStorage.setItem("etsyforge:seed", k);
-    } catch {}
+    } catch {
+      /* storage unavailable: the generator just opens empty */
+    }
     nav({ to: "/" });
   }
 
@@ -410,7 +412,7 @@ function KeywordsPage() {
                     <Label className="text-xs">Sort by</Label>
                     <select
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as any)}
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                       className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm h-9"
                     >
                       <option value="score">Opportunity (volume ÷ difficulty)</option>
@@ -469,7 +471,7 @@ function KeywordsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => useKeyword(r.keyword)}
+                              onClick={() => pickKeyword(r.keyword)}
                               className="h-7 text-xs"
                             >
                               Use →

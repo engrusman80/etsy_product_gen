@@ -1,3 +1,5 @@
+import { withDpi } from "@/lib/print-export";
+
 export type ImageEdits = {
   include: boolean;
   filename: string;
@@ -169,13 +171,14 @@ export async function bakeEdits(
     );
   }
 
-  return new Promise<Blob>((resolve, reject) =>
+  const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
       outputMime,
       outputMime === "image/jpeg" ? jpegQuality : undefined,
     ),
   );
+  return withDpi(blob);
 }
 
 function drawBannerText(

@@ -21,7 +21,8 @@ export const Route = createFileRoute("/editor")({
     src: typeof s.src === "string" ? s.src : undefined,
     back: typeof s.back === "string" ? s.back : undefined,
     key: typeof s.key === "string" ? s.key : undefined,
-    demo: typeof s.demo === "string" ? s.demo : undefined,
+    // The router JSON-parses search values, so `?demo=1` arrives as the number 1.
+    demo: s.demo === undefined || s.demo === null ? undefined : String(s.demo),
   }),
   component: EditorPage,
 });
@@ -30,23 +31,21 @@ function EditorPage() {
   const search = useSearch({ from: "/editor" });
   const navigate = useNavigate();
   const [initialImage, setInitialImage] = useState<string | undefined>();
-  const [loadDemo, setLoadDemo] = useState(false);
+  const loadDemo = search.demo === "1";
+  // CanvasStudio reads its initial image/demo flag once when the canvas is created, so only
+  // mount it after the image has been looked up (localStorage is only readable in the browser).
+  const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
-    if (search.demo === "1") {
-      setLoadDemo(true);
-      return;
-    }
     if (search.src) {
       setInitialImage(search.src);
-      return;
-    }
-    if (search.key && typeof window !== "undefined") {
+    } else if (search.key && typeof window !== "undefined") {
       // localStorage (works across tabs); fall back to sessionStorage for legacy callers.
       const v = localStorage.getItem(search.key) ?? sessionStorage.getItem(search.key);
       if (v) setInitialImage(v);
     }
-  }, [search.src, search.key, search.demo]);
+    setResolved(true);
+  }, [search.src, search.key]);
 
   const handleApply = (dataUrl: string) => {
     if (search.key && typeof window !== "undefined") {
@@ -63,14 +62,15 @@ function EditorPage() {
     else navigate({ to: "/" });
   };
 
+  const fallback = (
+    <div className="flex h-screen items-center justify-center bg-muted/40 text-sm text-muted-foreground">
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading studio…
+    </div>
+  );
+  if (!resolved) return fallback;
+
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-screen items-center justify-center bg-muted/40 text-sm text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading studio…
-        </div>
-      }
-    >
+    <Suspense fallback={fallback}>
       <CanvasStudio
         initialImage={initialImage}
         demoOnEmpty={loadDemo}

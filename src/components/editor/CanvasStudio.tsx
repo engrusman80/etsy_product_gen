@@ -569,7 +569,8 @@ export default function CanvasStudio({
       if (!c) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
-        e.shiftKey ? redo() : undo();
+        if (e.shiftKey) redo();
+        else undo();
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") {
         e.preventDefault();
         redo();
@@ -589,7 +590,8 @@ export default function CanvasStudio({
       else if (e.key === "p") setTool("draw");
       else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "g") {
         e.preventDefault();
-        e.shiftKey ? ungroupSelected() : groupSelected();
+        if (e.shiftKey) ungroupSelected();
+        else groupSelected();
       }
     };
     window.addEventListener("keydown", onKey);

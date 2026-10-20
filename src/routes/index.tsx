@@ -58,6 +58,7 @@ import { CostEstimateDialog } from "@/components/CostEstimateDialog";
 import { estimateRun, type Estimate, type EstimateInput } from "@/lib/cost-estimator";
 import { CrochetStudio } from "@/components/CrochetStudio";
 import { LandingPage } from "@/components/LandingPage";
+import { PRINT_DPI, removeWhiteBackground, withDpi } from "@/lib/print-export";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -200,6 +201,18 @@ const DEFAULT_SETTINGS: Settings = {
   ahrefsKey: "",
   kwEverywhereKey: "",
 };
+/**
+ * The Default AI gateway only has a key when the app runs on Lovable hosting. When the user
+ * kept it selected but entered a key for another provider, use that provider instead.
+ */
+function activeProvider(s: Settings): AIProvider {
+  if (s.aiProvider !== "lovable" || s.lovableKey) return s.aiProvider;
+  if (s.geminiKey) return "gemini";
+  if (s.openaiKey) return "openai";
+  if (s.openrouterKey) return "openrouter";
+  return "lovable";
+}
+
 const DEFAULT_SHOP: Shop = {
   shopName: "",
   instagram: "",
@@ -241,10 +254,16 @@ async function loadImage(b64: string): Promise<HTMLImageElement> {
   });
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
-  return new Promise((resolve, reject) =>
+async function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<Blob> {
+  const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("blob failed"))), type, quality),
   );
+  // Stamp 300 DPI so files open at the intended print size (4096px ≈ 13.65in).
+  return withDpi(blob);
 }
 
 async function resizePng(b64: string, size: number, withBg: string | null): Promise<Blob> {
@@ -281,10 +300,11 @@ async function imageDataUrlAtSize(
 
 async function makePdf(b64: string, size = DEFAULT_EXPORT_SIZE): Promise<Blob> {
   const imageUrl = await imageDataUrlAtSize(b64, size, "image/png");
-  const w = size,
-    h = size;
-  const pdf = new jsPDF({ unit: "px", format: [w, h] });
-  pdf.addImage(imageUrl, "PNG", 0, 0, w, h);
+  // Page size in inches at print DPI, so the PDF prints at the same size as the PNG.
+  const w = size / PRINT_DPI,
+    h = size / PRINT_DPI;
+  const pdf = new jsPDF({ unit: "in", format: [w, h], orientation: w > h ? "l" : "p" });
+  pdf.addImage(imageUrl, "PNG", 0, 0, w, h, undefined, "FAST");
   return pdf.output("blob");
 }
 
@@ -486,7 +506,9 @@ function Index() {
         setIdea((prev) => (prev ? prev : seed));
         localStorage.removeItem("etsyforge:seed");
       }
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }, []);
   const [shopOpen, setShopOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -558,7 +580,7 @@ function Index() {
 
   async function regenerateMockup(m: Mockup, tweak: string) {
     const okRun = await confirmCost({
-      provider: settings.aiProvider,
+      provider: activeProvider(settings),
       products: 0,
       variations: 1,
       mockupsPerVariation: 1,
@@ -659,7 +681,7 @@ function Index() {
 
   async function api<T>(url: string, body: unknown): Promise<T> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const provider = settings.aiProvider;
+    const provider = activeProvider(settings);
     const aiKey =
       provider === "openai"
         ? settings.openaiKey
@@ -710,6 +732,11 @@ function Index() {
       if (r.status === 429) {
         throw new Error(
           `${providerLabel} rate-limited (too many requests). Wait a moment and retry. (raw: ${rawMsg})`,
+        );
+      }
+      if (r.status === 401 && /missing api key/i.test(rawMsg)) {
+        throw new Error(
+          "No AI key is set. Open Settings (gear icon, top right) and add a Google Gemini, OpenAI or OpenRouter API key.",
         );
       }
       if (r.status === 401 || r.status === 403) {
@@ -772,7 +799,8 @@ function Index() {
       );
       transparent = bgRes.image;
     } catch (e) {
-      console.warn("background removal failed; using original image", e);
+      console.warn("remove.bg unavailable; cutting out the white background locally", e);
+      transparent = await removeWhiteBackground(imgRes.image).catch(() => imgRes.image);
     }
     const toGen = allMockups.filter((m) => selectedMockups.has(m.id));
     const mockupsList: Mockup[] = [];
@@ -805,7 +833,7 @@ function Index() {
 
     const mockupsCount = allMockups.filter((m) => selectedMockups.has(m.id)).length;
     const ok = await confirmCost({
-      provider: settings.aiProvider,
+      provider: activeProvider(settings),
       products: keywords.length,
       variations: vCount,
       mockupsPerVariation: mockupsCount,
@@ -851,7 +879,8 @@ function Index() {
           );
           transparent = bgRes.image;
         } catch (e) {
-          console.warn("background removal failed; using original image", e);
+          console.warn("remove.bg unavailable; cutting out the white background locally", e);
+          transparent = await removeWhiteBackground(imgRes.image).catch(() => imgRes.image);
         }
         setTransparentImage(transparent);
         setProgress(50);

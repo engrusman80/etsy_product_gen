@@ -144,7 +144,7 @@ Remember: maximise commercial demand. Output ONLY the JSON object.`;
                 String(k)
                   .toLowerCase()
                   .trim()
-                  .replace(/[^a-z0-9 \-]/g, "")
+                  .replace(/[^a-z0-9 -]/g, "")
                   .replace(/\s+/g, " "),
               )
               .filter((k) => k.length >= 2 && k.length <= 40);

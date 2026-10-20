@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- parses untyped JSON from several third-party keyword APIs */
 import { createFileRoute } from "@tanstack/react-router";
 
 type Row = {
