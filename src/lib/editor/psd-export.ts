@@ -74,9 +74,10 @@ async function renderObjectToFullCanvas(
 
 function layerName(obj: FObject, idx: number): string {
   const t = obj.type ?? "object";
-  // @ts-expect-error fabric text property
-  if (t === "i-text" || t === "text" || t === "textbox")
-    return `Text — ${(obj.text ?? "").toString().slice(0, 24) || "text"}`;
+  if (t === "i-text" || t === "text" || t === "textbox") {
+    const text = (obj as FObject & { text?: string }).text ?? "";
+    return `Text — ${text.toString().slice(0, 24) || "text"}`;
+  }
   if (t === "image") return `Image ${idx + 1}`;
   if (t === "rect") return `Rectangle ${idx + 1}`;
   if (t === "circle") return `Circle ${idx + 1}`;

@@ -25,12 +25,12 @@ type ProviderCost = {
 // derived from the underlying model published pricing.
 const LOVABLE: ProviderCost = {
   label: "Default AI",
-  usd: { text: 0.0002, image: 0.039, mockup: 0.039, removebg: 0 },
-  credits: { text: 0.02, image: 3.9, mockup: 3.9, removebg: 0 },
+  usd: { text: 0.0002, image: 0.134, mockup: 0.039, removebg: 0 },
+  credits: { text: 0.02, image: 13.4, mockup: 3.9, removebg: 0 },
   freeNote: "Uses your workspace credits ($25 free Cloud + $1 free AI / month).",
   models: {
     text: "google/gemini-2.5-flash",
-    image: "google/gemini-2.5-flash-image",
+    image: "google/gemini-3-pro-image-preview (2K)",
     mockup: "google/gemini-2.5-flash-image",
   },
 };
@@ -43,32 +43,32 @@ const OPENAI: ProviderCost = {
   models: {
     text: "gpt-4o-mini",
     image: "gpt-image-1 (high, 1024²)",
-    mockup: "gpt-image-1 (edits, 1024²)",
+    mockup: "gpt-image-1 (edits, high, 1024²)",
   },
 };
 
 const GEMINI: ProviderCost = {
   label: "Google Gemini",
-  usd: { text: 0.0001, image: 0.039, mockup: 0.039, removebg: 0 },
+  usd: { text: 0.0001, image: 0.134, mockup: 0.039, removebg: 0 },
   freeNote:
     "Free tier: 1,500 text + ~100 image requests/day on AI Studio keys. Estimates assume paid tier.",
   billingUrl: "https://aistudio.google.com/apikey",
   models: {
     text: "gemini-2.5-flash",
-    image: "gemini-2.5-flash-image-preview",
-    mockup: "gemini-2.5-flash-image-preview",
+    image: "gemini-3-pro-image-preview (2K)",
+    mockup: "gemini-2.5-flash-image",
   },
 };
 
 const OPENROUTER: ProviderCost = {
   label: "OpenRouter",
-  usd: { text: 0.0002, image: 0.04, mockup: 0.04, removebg: 0 },
+  usd: { text: 0.0002, image: 0.14, mockup: 0.04, removebg: 0 },
   freeNote: "Pay-per-use, ~5% markup over upstream provider.",
   billingUrl: "https://openrouter.ai/credits",
   models: {
     text: "google/gemini-2.5-flash",
-    image: "google/gemini-2.5-flash-image-preview",
-    mockup: "google/gemini-2.5-flash-image-preview",
+    image: "google/gemini-3-pro-image-preview (2K)",
+    mockup: "google/gemini-2.5-flash-image",
   },
 };
 

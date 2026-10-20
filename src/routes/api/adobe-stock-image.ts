@@ -61,6 +61,8 @@ export const Route = createFileRoute("/api/adobe-stock-image")({
             prompt: fullPrompt,
             aspectRatio: aspect,
             hires: hires ?? true,
+            // Adobe Stock needs >= 4 MP; Gemini 3 Pro Image renders ~4 MP natively at 2K.
+            imageSize: (hires ?? true) ? "2K" : undefined,
           });
           return Response.json({ image: b64, provider, vectorSuggested: looksVectorish(prompt) });
         } catch (e) {

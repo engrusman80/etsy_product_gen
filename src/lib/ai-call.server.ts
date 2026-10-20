@@ -126,11 +126,14 @@ export type ImageOpts = {
   aspectRatio?: string;
   /** When true, use gemini-3-pro-image-preview (higher fidelity, larger native output). */
   hires?: boolean;
+  /** Native output size for hi-res Gemini models (ignored by models that only do ~1K). */
+  imageSize?: "1K" | "2K" | "4K";
 };
 
 /** Returns the generated image as base64 PNG (no data: prefix). */
 export async function callImage(opts: ImageOpts): Promise<string> {
   const { provider, key, prompt, inputImageB64, aspectRatio, hires } = opts;
+  const { imageSize } = opts;
 
   if (provider === "openai") {
     // OpenAI image generation (text-to-image) or edits (image-to-image)
@@ -141,7 +144,10 @@ export async function callImage(opts: ImageOpts): Promise<string> {
       form.append("image", new Blob([bin], { type: "image/png" }), "input.png");
       form.append("prompt", prompt);
       form.append("model", "gpt-image-1");
-      form.append("size", "1024x1024");
+      form.append("size", pickOpenAiSize(aspectRatio));
+      form.append("quality", "high");
+      // Keep the provided artwork faithful (colors, linework, text) when compositing mockups.
+      form.append("input_fidelity", "high");
       form.append("n", "1");
       const res = await fetch("https://api.openai.com/v1/images/edits", {
         method: "POST",
@@ -199,7 +205,14 @@ export async function callImage(opts: ImageOpts): Promise<string> {
     // Falls back to gemini-2.5-flash-image if the pro model is overloaded.
     const primary = hires ? "gemini-3-pro-image-preview" : "gemini-2.5-flash-image";
     try {
-      return await geminiImageWithRetry(primary, key, prompt, inputImageB64, aspectRatio);
+      return await geminiImageWithRetry(
+        primary,
+        key,
+        prompt,
+        inputImageB64,
+        aspectRatio,
+        hires ? imageSize : undefined,
+      );
     } catch (e) {
       const msg = (e as Error).message || "";
       const isRegionBlock = /User location is not supported|FAILED_PRECONDITION|\b400\b/.test(msg);
@@ -216,6 +229,7 @@ export async function callImage(opts: ImageOpts): Promise<string> {
             inputImageB64,
             aspectRatio,
             hires,
+            imageSize,
           });
         }
         throw new Error(
@@ -234,12 +248,44 @@ export async function callImage(opts: ImageOpts): Promise<string> {
     }
   }
 
-  // Default + OpenRouter: OpenAI-compatible chat completions with Gemini image model
+  // Default + OpenRouter: OpenAI-compatible chat completions with Gemini image model.
+  // Hi-res requests use Gemini 3 Pro Image and fall back to Flash Image if it is unavailable.
+  if (hires) {
+    try {
+      return await chatCompletionsImage(
+        provider,
+        key,
+        "google/gemini-3-pro-image-preview",
+        prompt,
+        inputImageB64,
+        aspectRatio,
+        imageSize,
+      );
+    } catch (e) {
+      const s = statusFromError(e);
+      if (s === 401 || s === 402 || s === 429) throw e;
+    }
+  }
+  return chatCompletionsImage(
+    provider,
+    key,
+    "google/gemini-2.5-flash-image",
+    prompt,
+    inputImageB64,
+    aspectRatio,
+  );
+}
+
+async function chatCompletionsImage(
+  provider: Provider,
+  key: string,
+  model: string,
+  prompt: string,
+  inputImageB64?: string,
+  aspectRatio?: string,
+  imageSize?: string,
+): Promise<string> {
   const cfg = openAiCompatConfig(provider);
-  const model =
-    provider === "openrouter"
-      ? "google/gemini-2.5-flash-image-preview"
-      : "google/gemini-2.5-flash-image";
   const userContent: unknown = inputImageB64
     ? [
         { type: "text", text: prompt },
@@ -258,6 +304,15 @@ export async function callImage(opts: ImageOpts): Promise<string> {
       model,
       messages: [{ role: "user", content: userContent }],
       modalities: ["image", "text"],
+      // OpenRouter forwards these to Gemini; the default gateway does not document them.
+      ...(provider === "openrouter" && (aspectRatio || imageSize)
+        ? {
+            image_config: {
+              ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+              ...(imageSize ? { image_size: imageSize } : {}),
+            },
+          }
+        : {}),
     }),
   });
   if (!res.ok) throw await httpErr(res, `${provider} image`);
@@ -321,12 +376,18 @@ async function geminiImageWithRetry(
   prompt: string,
   inputImageB64?: string,
   aspectRatio?: string,
+  imageSize?: string,
 ): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const parts: Array<Record<string, unknown>> = [{ text: prompt }];
   if (inputImageB64) parts.push({ inlineData: { mimeType: "image/png", data: inputImageB64 } });
   const generationConfig: Record<string, unknown> = { responseModalities: ["IMAGE", "TEXT"] };
-  if (aspectRatio) generationConfig.imageConfig = { aspectRatio };
+  if (aspectRatio || imageSize) {
+    generationConfig.imageConfig = {
+      ...(aspectRatio ? { aspectRatio } : {}),
+      ...(imageSize ? { imageSize } : {}),
+    };
+  }
   const body = JSON.stringify({ contents: [{ role: "user", parts }], generationConfig });
 
   let lastErr: Error | null = null;
