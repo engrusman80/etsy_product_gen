@@ -13,11 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdobeStockRouteImport } from './routes/adobe-stock'
 import { Route as EditorRouteImport } from './routes/editor'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as ApiAdobeStockImageRouteImport } from './routes/api/adobe-stock-image'
 import { Route as ApiAdobeStockMetaRouteImport } from './routes/api/adobe-stock-meta'
 import { Route as ApiAdobeStockSvgRouteImport } from './routes/api/adobe-stock-svg'
 import { Route as ApiAdobeStockVideoRouteImport } from './routes/api/adobe-stock-video'
+import { Route as ApiCheckKeyRouteImport } from './routes/api/check-key'
 import { Route as ApiCrochetPatternRouteImport } from './routes/api/crochet-pattern'
 import { Route as ApiCrochetSuggestRouteImport } from './routes/api/crochet-suggest'
 import { Route as ApiGenerateDesignRouteImport } from './routes/api/generate-design'
@@ -45,6 +47,11 @@ const McpRoute = McpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotwellKnownChar93OauthProtectedResourceRoute =
   Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
     id: '/.well-known/oauth-protected-resource',
@@ -69,6 +76,11 @@ const ApiAdobeStockSvgRoute = ApiAdobeStockSvgRouteImport.update({
 const ApiAdobeStockVideoRoute = ApiAdobeStockVideoRouteImport.update({
   id: '/api/adobe-stock-video',
   path: '/api/adobe-stock-video',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCheckKeyRoute = ApiCheckKeyRouteImport.update({
+  id: '/api/check-key',
+  path: '/api/check-key',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCrochetPatternRoute = ApiCrochetPatternRouteImport.update({
@@ -107,11 +119,13 @@ export interface FileRoutesByFullPath {
   '/adobe-stock': typeof AdobeStockRoute
   '/editor': typeof EditorRoute
   '/mcp': typeof McpRoute
+  '/settings': typeof SettingsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/api/adobe-stock-image': typeof ApiAdobeStockImageRoute
   '/api/adobe-stock-meta': typeof ApiAdobeStockMetaRoute
   '/api/adobe-stock-svg': typeof ApiAdobeStockSvgRoute
   '/api/adobe-stock-video': typeof ApiAdobeStockVideoRoute
+  '/api/check-key': typeof ApiCheckKeyRoute
   '/api/crochet-pattern': typeof ApiCrochetPatternRoute
   '/api/crochet-suggest': typeof ApiCrochetSuggestRoute
   '/api/generate-design': typeof ApiGenerateDesignRoute
@@ -124,11 +138,13 @@ export interface FileRoutesByTo {
   '/adobe-stock': typeof AdobeStockRoute
   '/editor': typeof EditorRoute
   '/mcp': typeof McpRoute
+  '/settings': typeof SettingsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/api/adobe-stock-image': typeof ApiAdobeStockImageRoute
   '/api/adobe-stock-meta': typeof ApiAdobeStockMetaRoute
   '/api/adobe-stock-svg': typeof ApiAdobeStockSvgRoute
   '/api/adobe-stock-video': typeof ApiAdobeStockVideoRoute
+  '/api/check-key': typeof ApiCheckKeyRoute
   '/api/crochet-pattern': typeof ApiCrochetPatternRoute
   '/api/crochet-suggest': typeof ApiCrochetSuggestRoute
   '/api/generate-design': typeof ApiGenerateDesignRoute
@@ -142,11 +158,13 @@ export interface FileRoutesById {
   '/adobe-stock': typeof AdobeStockRoute
   '/editor': typeof EditorRoute
   '/mcp': typeof McpRoute
+  '/settings': typeof SettingsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/api/adobe-stock-image': typeof ApiAdobeStockImageRoute
   '/api/adobe-stock-meta': typeof ApiAdobeStockMetaRoute
   '/api/adobe-stock-svg': typeof ApiAdobeStockSvgRoute
   '/api/adobe-stock-video': typeof ApiAdobeStockVideoRoute
+  '/api/check-key': typeof ApiCheckKeyRoute
   '/api/crochet-pattern': typeof ApiCrochetPatternRoute
   '/api/crochet-suggest': typeof ApiCrochetSuggestRoute
   '/api/generate-design': typeof ApiGenerateDesignRoute
@@ -161,11 +179,13 @@ export interface FileRouteTypes {
     | '/adobe-stock'
     | '/editor'
     | '/mcp'
+    | '/settings'
     | '/.well-known/oauth-protected-resource'
     | '/api/adobe-stock-image'
     | '/api/adobe-stock-meta'
     | '/api/adobe-stock-svg'
     | '/api/adobe-stock-video'
+    | '/api/check-key'
     | '/api/crochet-pattern'
     | '/api/crochet-suggest'
     | '/api/generate-design'
@@ -178,11 +198,13 @@ export interface FileRouteTypes {
     | '/adobe-stock'
     | '/editor'
     | '/mcp'
+    | '/settings'
     | '/.well-known/oauth-protected-resource'
     | '/api/adobe-stock-image'
     | '/api/adobe-stock-meta'
     | '/api/adobe-stock-svg'
     | '/api/adobe-stock-video'
+    | '/api/check-key'
     | '/api/crochet-pattern'
     | '/api/crochet-suggest'
     | '/api/generate-design'
@@ -195,11 +217,13 @@ export interface FileRouteTypes {
     | '/adobe-stock'
     | '/editor'
     | '/mcp'
+    | '/settings'
     | '/.well-known/oauth-protected-resource'
     | '/api/adobe-stock-image'
     | '/api/adobe-stock-meta'
     | '/api/adobe-stock-svg'
     | '/api/adobe-stock-video'
+    | '/api/check-key'
     | '/api/crochet-pattern'
     | '/api/crochet-suggest'
     | '/api/generate-design'
@@ -213,11 +237,13 @@ export interface RootRouteChildren {
   AdobeStockRoute: typeof AdobeStockRoute
   EditorRoute: typeof EditorRoute
   McpRoute: typeof McpRoute
+  SettingsRoute: typeof SettingsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiAdobeStockImageRoute: typeof ApiAdobeStockImageRoute
   ApiAdobeStockMetaRoute: typeof ApiAdobeStockMetaRoute
   ApiAdobeStockSvgRoute: typeof ApiAdobeStockSvgRoute
   ApiAdobeStockVideoRoute: typeof ApiAdobeStockVideoRoute
+  ApiCheckKeyRoute: typeof ApiCheckKeyRoute
   ApiCrochetPatternRoute: typeof ApiCrochetPatternRoute
   ApiCrochetSuggestRoute: typeof ApiCrochetSuggestRoute
   ApiGenerateDesignRoute: typeof ApiGenerateDesignRoute
@@ -256,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.well-known/oauth-protected-resource': {
       id: '/.well-known/oauth-protected-resource'
       path: '/.well-known/oauth-protected-resource'
@@ -289,6 +322,13 @@ declare module '@tanstack/react-router' {
       path: '/api/adobe-stock-video'
       fullPath: '/api/adobe-stock-video'
       preLoaderRoute: typeof ApiAdobeStockVideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/check-key': {
+      id: '/api/check-key'
+      path: '/api/check-key'
+      fullPath: '/api/check-key'
+      preLoaderRoute: typeof ApiCheckKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/crochet-pattern': {
@@ -341,12 +381,14 @@ const rootRouteChildren: RootRouteChildren = {
   AdobeStockRoute: AdobeStockRoute,
   EditorRoute: EditorRoute,
   McpRoute: McpRoute,
+  SettingsRoute: SettingsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiAdobeStockImageRoute: ApiAdobeStockImageRoute,
   ApiAdobeStockMetaRoute: ApiAdobeStockMetaRoute,
   ApiAdobeStockSvgRoute: ApiAdobeStockSvgRoute,
   ApiAdobeStockVideoRoute: ApiAdobeStockVideoRoute,
+  ApiCheckKeyRoute: ApiCheckKeyRoute,
   ApiCrochetPatternRoute: ApiCrochetPatternRoute,
   ApiCrochetSuggestRoute: ApiCrochetSuggestRoute,
   ApiGenerateDesignRoute: ApiGenerateDesignRoute,

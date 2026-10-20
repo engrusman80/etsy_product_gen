@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import { jsPDF } from "jspdf";
@@ -12,7 +12,6 @@ import {
   Copy,
   Check,
   AlertCircle,
-  Settings as SettingsIcon,
   ChevronDown,
   ChevronUp,
   Film,
@@ -35,15 +34,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useTheme } from "@/hooks/use-theme";
 import { ImageEditor } from "@/components/ImageEditor";
@@ -70,6 +60,7 @@ import {
   traceVector,
   withDpi,
 } from "@/lib/print-export";
+import { activeProvider, hasAiKey, useSettings } from "@/lib/settings-store";
 import {
   DEFAULT_PRODUCT_TYPE,
   PRODUCT_TYPES,
@@ -188,17 +179,6 @@ function slugify(s: string): string {
   );
 }
 
-type AIProvider = "lovable" | "openai" | "gemini" | "openrouter";
-type Settings = {
-  aiProvider: AIProvider;
-  lovableKey: string;
-  openaiKey: string;
-  geminiKey: string;
-  openrouterKey: string;
-  removeBgKey: string;
-  /** "4k": native 4K pro image; "fast": cheaper ~1K flash image upscaled to 4096px. */
-  imageQuality: "4k" | "fast";
-};
 type Shop = {
   shopName: string;
   instagram: string;
@@ -208,36 +188,6 @@ type Shop = {
   website: string;
   email: string;
 };
-
-const DEFAULT_SETTINGS: Settings = {
-  aiProvider: "lovable",
-  lovableKey: "",
-  openaiKey: "",
-  geminiKey: "",
-  openrouterKey: "",
-  removeBgKey: "",
-  imageQuality: "4k",
-};
-/**
- * The Default AI gateway only has a key when the app runs on Lovable hosting. When the user
- * kept it selected but entered a key for another provider, use that provider instead.
- */
-/** True when the user entered a key for the provider that will be used. */
-function hasAiKey(s: Settings): boolean {
-  const p = activeProvider(s);
-  if (p === "gemini") return !!s.geminiKey;
-  if (p === "openai") return !!s.openaiKey;
-  if (p === "openrouter") return !!s.openrouterKey;
-  return !!s.lovableKey;
-}
-
-function activeProvider(s: Settings): AIProvider {
-  if (s.aiProvider !== "lovable" || s.lovableKey) return s.aiProvider;
-  if (s.geminiKey) return "gemini";
-  if (s.openaiKey) return "openai";
-  if (s.openrouterKey) return "openrouter";
-  return "lovable";
-}
 
 const DEFAULT_SHOP: Shop = {
   shopName: "",
@@ -544,14 +494,8 @@ function Index() {
     if (search.tab) setActiveTab(search.tab);
   }, [search.tab]);
   const { theme, toggle } = useTheme();
-  const [settings, setSettings] = useLocal<Settings>("etsyforge:settings", DEFAULT_SETTINGS);
+  const [settings] = useSettings();
   const [shop, setShop] = useLocal<Shop>("etsyforge:shop", DEFAULT_SHOP);
-
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [draftSettings, setDraftSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  useEffect(() => {
-    setDraftSettings(settings);
-  }, [settings, settingsOpen]);
 
   const [idea, setIdea] = useState("");
   useEffect(() => {
@@ -816,7 +760,7 @@ function Index() {
       }
       if (r.status === 401 && /missing api key/i.test(rawMsg)) {
         throw new Error(
-          "No AI key is set. Open Settings (gear icon, top right) and add a Google Gemini, OpenAI or OpenRouter API key.",
+          "No AI key is set. Open Settings (top menu) and add a Google Gemini, OpenAI or OpenRouter API key.",
         );
       }
       if (r.status === 401 || r.status === 403) {
@@ -1430,247 +1374,6 @@ function Index() {
           onNavigate={setActiveTab}
           actions={
             <>
-              <Dialog
-                open={settingsOpen}
-                onOpenChange={(open) => {
-                  // Closing with X, Esc or a click outside keeps what was typed, like Save.
-                  if (!open) setSettings(draftSettings);
-                  setSettingsOpen(open);
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Settings"
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted"
-                  >
-                    <SettingsIcon className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>AI Provider & API Keys</DialogTitle>
-                    <DialogDescription>
-                      Stored locally in your browser only. Pick a provider and paste your own key —
-                      works on any host (local, RDP, Namecheap, Vercel).
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-2">
-                    <div>
-                      <Label htmlFor="prov">AI Provider</Label>
-                      <select
-                        id="prov"
-                        className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={draftSettings.aiProvider}
-                        onChange={(e) =>
-                          setDraftSettings({
-                            ...draftSettings,
-                            aiProvider: e.target.value as AIProvider,
-                          })
-                        }
-                      >
-                        <option value="lovable">
-                          Default AI (auto-provisioned on managed hosting)
-                        </option>
-                        <option value="gemini">
-                          Google Gemini (recommended — generous free tier)
-                        </option>
-                        <option value="openai">OpenAI (highest quality, paid)</option>
-                        <option value="openrouter">OpenRouter (one key for many models)</option>
-                      </select>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {draftSettings.aiProvider === "gemini" && (
-                          <>
-                            Get a free key at{" "}
-                            <a
-                              href="https://aistudio.google.com/apikey"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              aistudio.google.com/apikey
-                            </a>{" "}
-                            . Free for SEO and pattern text; image generation needs billing on the
-                            key.
-                          </>
-                        )}
-                        {draftSettings.aiProvider === "openai" && (
-                          <>
-                            Get a key at{" "}
-                            <a
-                              href="https://platform.openai.com/api-keys"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              platform.openai.com/api-keys
-                            </a>
-                            . Pay-per-use.
-                          </>
-                        )}
-                        {draftSettings.aiProvider === "openrouter" && (
-                          <>
-                            Get a key at{" "}
-                            <a
-                              href="https://openrouter.ai/keys"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              openrouter.ai/keys
-                            </a>
-                            . Access OpenAI/Gemini/Claude with one key.
-                          </>
-                        )}
-                        {draftSettings.aiProvider === "lovable" && (
-                          <>
-                            Only works on managed hosting (auto-provisioned). For self-hosting pick
-                            Gemini, OpenAI, or OpenRouter.
-                          </>
-                        )}
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="iq">Image quality</Label>
-                      <select
-                        id="iq"
-                        className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={draftSettings.imageQuality}
-                        onChange={(e) =>
-                          setDraftSettings({
-                            ...draftSettings,
-                            imageQuality: e.target.value as Settings["imageQuality"],
-                          })
-                        }
-                      >
-                        <option value="4k">
-                          Native 4K (best for prints, about $0.24 per design)
-                        </option>
-                        <option value="fast">
-                          Fast and cheap (~1K upscaled to 4K, about $0.04)
-                        </option>
-                      </select>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Fast mode is fine for stickers, wallpapers and testing ideas. Use native 4K
-                        for wall art and large prints. OpenAI has one quality level.
-                      </p>
-                    </div>
-
-                    {draftSettings.aiProvider === "lovable" && (
-                      <div>
-                        <Label htmlFor="lk">Muhammad Usman secret Key (optional override)</Label>
-                        <Input
-                          id="lk"
-                          type="password"
-                          autoComplete="off"
-                          className="mt-1.5"
-                          placeholder="Leave blank to use server default"
-                          value={draftSettings.lovableKey}
-                          onChange={(e) =>
-                            setDraftSettings({ ...draftSettings, lovableKey: e.target.value })
-                          }
-                        />
-                      </div>
-                    )}
-                    {draftSettings.aiProvider === "gemini" && (
-                      <div>
-                        <Label htmlFor="gk">Google Gemini API Key</Label>
-                        <Input
-                          id="gk"
-                          type="password"
-                          autoComplete="off"
-                          className="mt-1.5"
-                          placeholder="AIza..."
-                          value={draftSettings.geminiKey}
-                          onChange={(e) =>
-                            setDraftSettings({ ...draftSettings, geminiKey: e.target.value })
-                          }
-                        />
-                      </div>
-                    )}
-                    {draftSettings.aiProvider === "openai" && (
-                      <div>
-                        <Label htmlFor="ok">OpenAI API Key</Label>
-                        <Input
-                          id="ok"
-                          type="password"
-                          autoComplete="off"
-                          className="mt-1.5"
-                          placeholder="sk-..."
-                          value={draftSettings.openaiKey}
-                          onChange={(e) =>
-                            setDraftSettings({ ...draftSettings, openaiKey: e.target.value })
-                          }
-                        />
-                      </div>
-                    )}
-                    {draftSettings.aiProvider === "openrouter" && (
-                      <div>
-                        <Label htmlFor="ork">OpenRouter API Key</Label>
-                        <Input
-                          id="ork"
-                          type="password"
-                          autoComplete="off"
-                          className="mt-1.5"
-                          placeholder="sk-or-..."
-                          value={draftSettings.openrouterKey}
-                          onChange={(e) =>
-                            setDraftSettings({ ...draftSettings, openrouterKey: e.target.value })
-                          }
-                        />
-                      </div>
-                    )}
-
-                    <div className="border-t pt-4">
-                      <Label htmlFor="rk">remove.bg API Key (for background removal)</Label>
-                      <Input
-                        id="rk"
-                        type="password"
-                        autoComplete="off"
-                        className="mt-1.5"
-                        placeholder="Your remove.bg key"
-                        value={draftSettings.removeBgKey}
-                        onChange={(e) =>
-                          setDraftSettings({ ...draftSettings, removeBgKey: e.target.value })
-                        }
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Free 50/month at{" "}
-                        <a
-                          href="https://www.remove.bg/api"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline"
-                        >
-                          remove.bg/api
-                        </a>
-                        .
-                      </p>
-                    </div>
-                  </div>
-                  <DialogFooter className="gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSettings(DEFAULT_SETTINGS);
-                        setSettingsOpen(false);
-                      }}
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setSettings(draftSettings);
-                        setSettingsOpen(false);
-                      }}
-                    >
-                      Save
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
               <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>

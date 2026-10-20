@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Image as ImageIcon, Scissors, Wand2 } from "lucide-react";
+import { Image as ImageIcon, Scissors, Settings as SettingsIcon, Wand2 } from "lucide-react";
 
-export type NavKey = "home" | "product" | "crochet" | "adobe";
+export type NavKey = "home" | "product" | "crochet" | "adobe" | "settings";
 
 type NavItem = { key: NavKey; label: string; icon: typeof Wand2 };
 
@@ -10,6 +10,7 @@ const ITEMS: NavItem[] = [
   { key: "product", label: "Create product", icon: Wand2 },
   { key: "crochet", label: "Crochet patterns", icon: Scissors },
   { key: "adobe", label: "Adobe Stock", icon: ImageIcon },
+  { key: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function BrandMark({ className = "" }: { className?: string }) {
@@ -59,6 +60,12 @@ export function SiteHeader({
         {it.label}
       </>
     );
+    if (it.key === "settings")
+      return (
+        <Link key={it.key} to="/settings" className={itemClass(on)}>
+          {body}
+        </Link>
+      );
     if (it.key === "adobe")
       return (
         <Link key={it.key} to="/adobe-stock" className={itemClass(on)}>

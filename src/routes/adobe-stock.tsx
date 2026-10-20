@@ -1,7 +1,7 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Loader2,
   Download,
@@ -19,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,14 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { upscaleImage, downloadBlob } from "@/lib/adobe-stock/upscale";
+import { keyFor, useSettings } from "@/lib/settings-store";
 import { checkAdobePolicy } from "@/lib/adobe-stock/policy";
 import { AdobeMetaPanel } from "@/components/AdobeMetaPanel";
 import { filterTrending, type TrendingPrompt } from "@/lib/adobe-stock/trending-prompts";
@@ -58,44 +51,20 @@ export const Route = createFileRoute("/adobe-stock")({
 
 type Provider = "gemini" | "openai" | "xai";
 
+/** Adobe Stock reads the shared keys from the Settings page. */
 function useApiKeys() {
-  const [provider, setProvider] = useState<Provider>("gemini");
-  const [gemini, setGemini] = useState("");
-  const [openai, setOpenai] = useState("");
-  const [xai, setXai] = useState("");
-  useEffect(() => {
-    setProvider((localStorage.getItem("as_provider") as Provider) || "gemini");
-    setGemini(localStorage.getItem("as_gemini_key") || "");
-    setOpenai(localStorage.getItem("as_openai_key") || "");
-    setXai(localStorage.getItem("as_xai_key") || "");
-  }, []);
-  const save = () => {
-    localStorage.setItem("as_provider", provider);
-    localStorage.setItem("as_gemini_key", gemini);
-    localStorage.setItem("as_openai_key", openai);
-    localStorage.setItem("as_xai_key", xai);
-  };
+  const [settings] = useSettings();
+  const provider: Provider = settings.adobeProvider;
   const headers = (): HeadersInit => {
     const h: Record<string, string> = {
       "Content-Type": "application/json",
       "x-ai-provider": provider,
     };
-    const key = provider === "gemini" ? gemini : provider === "openai" ? openai : xai;
+    const key = keyFor(settings, provider);
     if (key) h["x-ai-key"] = key;
     return h;
   };
-  return {
-    provider,
-    setProvider,
-    gemini,
-    setGemini,
-    openai,
-    setOpenai,
-    xai,
-    setXai,
-    save,
-    headers,
-  };
+  return { provider, gemini: settings.geminiKey, headers };
 }
 
 function AdobeStock() {
@@ -103,7 +72,17 @@ function AdobeStock() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <SiteHeader active="adobe" actions={<KeysDialog keys={keys} />} />
+      <SiteHeader
+        active="adobe"
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/settings">
+              <KeyRound className="mr-2 h-4 w-4" />
+              API keys
+            </Link>
+          </Button>
+        }
+      />
       <section className="border-b border-border bg-paper">
         <div className="mx-auto max-w-6xl px-4 py-8">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
@@ -165,87 +144,6 @@ function AdobeStock() {
       </main>
       <SiteFooter />
     </div>
-  );
-}
-
-function KeysDialog({ keys }: { keys: ReturnType<typeof useApiKeys> }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <KeyRound className="h-4 w-4 mr-2" />
-          API Keys
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>API Keys (saved locally)</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label>Preferred provider</Label>
-            <Select value={keys.provider} onValueChange={(v) => keys.setProvider(v as Provider)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gemini">Google Gemini (Nano Banana 2 — cheapest)</SelectItem>
-                <SelectItem value="openai">OpenAI gpt-image-1 (highest photorealism)</SelectItem>
-                <SelectItem value="xai">xAI Grok 2 Image</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Tip: OpenAI gpt-image-1 (high quality) produces the sharpest photorealistic detail for
-              Adobe Stock. Gemini is fastest/cheapest. Grok is a creative alternative.
-            </p>
-          </div>
-          <div>
-            <Label>Gemini API key</Label>
-            <Input
-              type="password"
-              value={keys.gemini}
-              onChange={(e) => keys.setGemini(e.target.value)}
-              placeholder="AIza..."
-            />
-            <p className="text-xs text-muted-foreground mt-1">aistudio.google.com</p>
-          </div>
-          <div>
-            <Label>OpenAI API key</Label>
-            <Input
-              type="password"
-              value={keys.openai}
-              onChange={(e) => keys.setOpenai(e.target.value)}
-              placeholder="sk-..."
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              platform.openai.com — gpt-image-1 gives the best zoom fidelity.
-            </p>
-          </div>
-          <div>
-            <Label>xAI (Grok) API key</Label>
-            <Input
-              type="password"
-              value={keys.xai}
-              onChange={(e) => keys.setXai(e.target.value)}
-              placeholder="xai-..."
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              console.x.ai — model grok-2-image-1212.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              keys.save();
-              setOpen(false);
-            }}
-            className="w-full"
-          >
-            Save
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -931,7 +829,11 @@ function VideoPanel({ keys }: { keys: ReturnType<typeof useApiKeys> }) {
         </div>
         {!keys.gemini && (
           <p className="text-xs text-amber-600">
-            Add your Gemini API key (top-right) — video uses Veo which is Gemini-only.
+            Add your Gemini API key on the{" "}
+            <Link to="/settings" className="underline">
+              Settings page
+            </Link>
+            . Video uses Veo, which is Gemini-only.
           </p>
         )}
 
