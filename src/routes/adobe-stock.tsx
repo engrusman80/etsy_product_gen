@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { upscaleImage, downloadBlob } from "@/lib/adobe-stock/upscale";
-import { keyFor, useSettings } from "@/lib/settings-store";
+import { aiHeaders, useSettings } from "@/lib/settings-store";
 import { checkAdobePolicy } from "@/lib/adobe-stock/policy";
 import { AdobeMetaPanel } from "@/components/AdobeMetaPanel";
 import { filterTrending, type TrendingPrompt } from "@/lib/adobe-stock/trending-prompts";
@@ -56,13 +56,7 @@ function useApiKeys() {
   const [settings] = useSettings();
   const provider: Provider = settings.adobeProvider;
   const headers = (): HeadersInit => {
-    const h: Record<string, string> = {
-      "Content-Type": "application/json",
-      "x-ai-provider": provider,
-    };
-    const key = keyFor(settings, provider);
-    if (key) h["x-ai-key"] = key;
-    return h;
+    return { "Content-Type": "application/json", ...aiHeaders(settings, provider) };
   };
   return { provider, gemini: settings.geminiKey, headers };
 }

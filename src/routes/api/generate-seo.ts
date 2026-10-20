@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { resolveTextProvider, callText, statusFromError } from "@/lib/ai-call.server";
 import { IP_RULES, findProtectedTerm, hasProfanity } from "@/lib/ip-guard";
 import { getProductType } from "@/lib/product-types";
 
@@ -171,7 +171,7 @@ export const Route = createFileRoute("/api/generate-seo")({
             );
           }
 
-          const { provider, key } = resolveProvider(request);
+          const { provider, key } = resolveTextProvider(request);
           if (!key)
             return Response.json(
               { error: `Missing API key for ${provider}. Add it in Settings.` },

@@ -130,10 +130,20 @@ export const Route = createFileRoute("/api/generate-mockup")({
               { status: 401 },
             );
 
+          // Listing photos are what buyers see first and Etsy asks for 2000px, so the best setting
+          // uses the Pro image model at 2K; "fast" keeps the cheaper ~1K Flash model.
+          const hires = request.headers.get("x-image-quality") !== "fast";
           let lastErr: unknown = null;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
-              const b64 = await callImage({ provider, key, prompt, inputImageB64: image });
+              const b64 = await callImage({
+                provider,
+                key,
+                prompt,
+                inputImageB64: image,
+                hires,
+                imageSize: hires ? "2K" : undefined,
+              });
               return Response.json({ image: b64 });
             } catch (e) {
               lastErr = e;

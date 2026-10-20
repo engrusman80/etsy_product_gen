@@ -11,9 +11,21 @@ import { useEffect, useState } from "react";
  */
 export type AIProvider = "gemini" | "openrouter";
 export type AdobeProvider = AIProvider;
+/** Claude ("anthropic") writes text only: it has no image model. */
+export type TextProvider = "anthropic" | AIProvider;
+
+export const PROVIDER_LABEL: Record<TextProvider, string> = {
+  anthropic: "Claude",
+  gemini: "Google Gemini",
+  openrouter: "OpenRouter",
+};
 
 export type Settings = {
+  /** Image provider (designs, thumbnails, mockups). */
   aiProvider: AIProvider;
+  /** Who writes patterns, PDF text and SEO. "auto": Claude when its key is set, else aiProvider. */
+  textAi: "auto" | TextProvider;
+  claudeKey: string;
   geminiKey: string;
   openrouterKey: string;
   removeBgKey: string;
@@ -48,6 +60,8 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   aiProvider: "gemini",
+  textAi: "auto",
+  claudeKey: "",
   geminiKey: "",
   openrouterKey: "",
   removeBgKey: "",
@@ -78,6 +92,8 @@ function clean(raw: Partial<Record<keyof Settings, unknown>>): Settings {
   const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
   return {
     aiProvider: isProvider(raw.aiProvider) ? raw.aiProvider : "gemini",
+    textAi: raw.textAi === "anthropic" || isProvider(raw.textAi) ? raw.textAi : "auto",
+    claudeKey: str(raw.claudeKey),
     geminiKey: str(raw.geminiKey),
     openrouterKey: str(raw.openrouterKey),
     removeBgKey: str(raw.removeBgKey),
@@ -167,4 +183,30 @@ export function keyFor(s: Settings, p: AIProvider): string {
 /** True when the user entered a key for the provider that will be used. */
 export function hasAiKey(s: Settings): boolean {
   return !!keyFor(s, activeProvider(s));
+}
+
+export const textKeyFor = (s: Settings, p: TextProvider) =>
+  p === "anthropic" ? s.claudeKey : keyFor(s, p);
+
+/** Who writes text: the chosen one when it has a key, else Claude when its key is set, else images'. */
+export function textProvider(s: Settings): TextProvider {
+  if (s.textAi !== "auto" && textKeyFor(s, s.textAi)) return s.textAi;
+  return s.claudeKey ? "anthropic" : activeProvider(s);
+}
+
+export const hasTextKey = (s: Settings) => !!textKeyFor(s, textProvider(s));
+
+/** Headers for /api calls: the image provider, plus the text provider when another one writes. */
+export function aiHeaders(s: Settings, image: AIProvider = activeProvider(s)) {
+  const h: Record<string, string> = {
+    "X-AI-Provider": image,
+    "X-Image-Quality": s.imageQuality,
+  };
+  if (keyFor(s, image)) h["X-AI-Key"] = keyFor(s, image);
+  const text = textProvider(s);
+  if (text !== image) {
+    h["X-Text-Provider"] = text;
+    if (textKeyFor(s, text)) h["X-Text-Key"] = textKeyFor(s, text);
+  }
+  return h;
 }

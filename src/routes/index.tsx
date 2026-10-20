@@ -61,7 +61,15 @@ import {
   traceVector,
   withDpi,
 } from "@/lib/print-export";
-import { activeProvider, hasAiKey, keyFor, useSettings } from "@/lib/settings-store";
+import {
+  PROVIDER_LABEL,
+  activeProvider,
+  aiHeaders,
+  hasAiKey,
+  hasTextKey,
+  textProvider,
+  useSettings,
+} from "@/lib/settings-store";
 import {
   ETSY_FILE_MAX,
   TAXONOMY_WORDS,
@@ -146,6 +154,15 @@ const MOCKUPS = [
 ];
 
 const DEFAULT_SELECTED = new Set(getProductType(DEFAULT_PRODUCT_TYPE).mockups);
+
+/** Routes that only write text, so they use the text AI (Claude when its key is set). */
+const TEXT_ROUTES = new Set([
+  "/api/generate-seo",
+  "/api/crochet-pattern",
+  "/api/crochet-suggest",
+  "/api/product-ideas",
+  "/api/improve-listing",
+]);
 
 const DEFAULT_EXPORT_SIZE = 4096;
 const RES = [{ label: "4096", size: DEFAULT_EXPORT_SIZE }];
@@ -580,7 +597,11 @@ function Index() {
 
   async function confirmCost(input: EstimateInput): Promise<boolean> {
     if (skipCostRef.current) return true;
-    const est = estimateRun(input);
+    const est = estimateRun({
+      fastImage: settings.imageQuality === "fast",
+      claudeText: textProvider(settings) === "anthropic",
+      ...input,
+    });
     if (est.totalCalls === 0) return true;
     setCostEstimate(est);
     setCostOpen(true);
@@ -718,11 +739,12 @@ function Index() {
   };
 
   async function api<T>(url: string, body: unknown): Promise<T> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const provider = activeProvider(settings);
-    const aiKey = keyFor(settings, provider);
-    headers["X-AI-Provider"] = provider;
-    if (aiKey) headers["X-AI-Key"] = aiKey;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...aiHeaders(settings),
+    };
+    // Errors from text routes come from whoever writes text, which can be Claude.
+    const provider = TEXT_ROUTES.has(url) ? textProvider(settings) : activeProvider(settings);
     if (settings.removeBgKey) headers["X-RemoveBg-Key"] = settings.removeBgKey;
     const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
     const text = await r.text();
@@ -733,7 +755,7 @@ function Index() {
       /* non-JSON */
     }
     if (!r.ok) {
-      const providerLabel = provider === "gemini" ? "Google Gemini" : "OpenRouter";
+      const providerLabel = PROVIDER_LABEL[provider];
       const rawMsg = j.error || text || `Request failed (${r.status})`;
       if (r.status === 504 || /timeout/i.test(rawMsg)) {
         throw new Error(`${providerLabel} took too long to respond. Please try again.`);
@@ -742,7 +764,9 @@ function Index() {
         const hint =
           provider === "gemini"
             ? "Check your Google AI Studio quota and billing at aistudio.google.com/apikey, or switch provider in Settings."
-            : "Top up at openrouter.ai/credits, or switch provider in Settings.";
+            : provider === "anthropic"
+              ? "Add credits at console.anthropic.com (Plans & Billing), or pick another text AI in Settings."
+              : "Top up at openrouter.ai/credits, or switch provider in Settings.";
         throw new Error(`${providerLabel} credits exhausted — ${hint} (raw: ${rawMsg})`);
       }
       if (
@@ -761,7 +785,7 @@ function Index() {
       }
       if (r.status === 401 && /missing api key/i.test(rawMsg)) {
         throw new Error(
-          "No AI key is set. Open Settings (top menu) and add a Google Gemini or OpenRouter API key.",
+          "No AI key is set. Open Settings (top menu) and add a Claude, Google Gemini or OpenRouter API key.",
         );
       }
       if (r.status === 401 || r.status === 403) {
@@ -903,6 +927,7 @@ function Index() {
         .trim() ||
       "My design";
     const withKey = hasAiKey(settings);
+    const withText = hasTextKey(settings);
     const toGen = withKey ? allMockups.filter((m) => selectedMockups.has(m.id)) : [];
     if (withKey) {
       const ok = await confirmCost({
@@ -956,7 +981,7 @@ function Index() {
       setProgress(50);
 
       const placeholderSeo: SEO = { title: name, description: "", tags: [] };
-      if (withKey) {
+      if (withText) {
         setStep("Writing Etsy SEO listing…");
         try {
           setSeo(
@@ -999,7 +1024,9 @@ function Index() {
       setStep(
         withKey
           ? "Done!"
-          : "Done! Files are ready. Add an AI key in Settings for SEO copy and mockups.",
+          : withText
+            ? "Done! Add a Gemini or OpenRouter key in Settings for mockup photos."
+            : "Done! Files are ready. Add an AI key in Settings for SEO copy and mockups.",
       );
     } catch (e) {
       setErr((e as Error).message);

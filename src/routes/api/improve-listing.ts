@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { resolveTextProvider, callText, statusFromError } from "@/lib/ai-call.server";
 import { IP_RULES, findProtectedTerm } from "@/lib/ip-guard";
 
 /** Rewrites an existing Etsy listing's title, tags and description for search, keeping its facts. */
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/improve-listing")({
             tags: string[];
             competitorTitles?: string[];
           };
-          const { provider, key } = resolveProvider(request);
+          const { provider, key } = resolveTextProvider(request);
           if (!key)
             return Response.json(
               { error: `Missing API key for ${provider}. Add it in Settings.` },

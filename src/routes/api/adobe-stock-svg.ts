@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { resolveTextProvider, callText, statusFromError } from "@/lib/ai-call.server";
 import { checkAdobePolicy, ADOBE_NEGATIVE_CLAUSE } from "@/lib/adobe-stock/policy";
 import { originalitySeed } from "@/lib/adobe-stock/originality";
 
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/adobe-stock-svg")({
           // Default Adobe-compliant artboard ≈ 4000×4000 → 16 MP (min 15, max 65).
           const size = Math.min(8000, Math.max(3873, artboard ?? 4000));
 
-          const { provider, key } = resolveProvider(request);
+          const { provider, key } = resolveTextProvider(request);
           if (!key)
             return Response.json(
               { error: `Missing API key for ${provider}. Add it in Settings.` },

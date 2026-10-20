@@ -1,18 +1,12 @@
-import { activeProvider, keyFor, loadSettings } from "@/lib/settings-store";
+import { aiHeaders, loadSettings } from "@/lib/settings-store";
 import { etsyCall } from "@/lib/etsy/client";
 
 /** Pricing, demand and sale-timing helpers for the Etsy page and the daily drafts. */
 
 export async function aiPost<T>(url: string, body: unknown): Promise<T> {
-  const s = loadSettings();
-  const provider = activeProvider(s);
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-AI-Provider": provider,
-      "X-AI-Key": keyFor(s, provider),
-    },
+    headers: { "Content-Type": "application/json", ...aiHeaders(loadSettings()) },
     body: JSON.stringify(body),
   });
   const j = (await res.json()) as T & { error?: string };

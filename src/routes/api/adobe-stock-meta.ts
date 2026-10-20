@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { resolveTextProvider, callText, statusFromError } from "@/lib/ai-call.server";
 
 // Generates Adobe Stock-optimized SEO metadata for a generated asset.
 // Strategy: prioritise HIGH-DEMAND, COMMERCIAL keywords that buyers actually search for
@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/adobe-stock-meta")({
             return Response.json({ error: "Missing prompt or assetType" }, { status: 400 });
           }
 
-          const { provider, key } = resolveProvider(request);
+          const { provider, key } = resolveTextProvider(request);
           if (!key) {
             return Response.json(
               { error: `Missing API key for ${provider}. Add it in Settings.` },

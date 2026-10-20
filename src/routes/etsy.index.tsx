@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTheme } from "@/hooks/use-theme";
-import { hasAiKey, useSettings } from "@/lib/settings-store";
+import { hasTextKey, useSettings } from "@/lib/settings-store";
 import { PRODUCT_TYPES } from "@/lib/product-types";
 import {
   addToQueue,
@@ -97,7 +97,7 @@ function EtsyPage() {
   const [settings, save] = useSettings();
   const { theme, toggle } = useTheme();
   const connected = etsyConnected(settings);
-  const aiReady = hasAiKey(settings);
+  const aiReady = hasTextKey(settings);
 
   const [checking, setChecking] = useState(false);
   const [reports, setReports] = useState<ListingReport[] | null>(null);
@@ -310,7 +310,8 @@ function EtsyPage() {
               <Link to="/settings" className="underline">
                 Change in Settings
               </Link>
-              {!aiReady && " Add a Gemini or OpenRouter key in Settings for AI SEO and ideas."}
+              {!aiReady &&
+                " Add a Claude, Gemini or OpenRouter key in Settings for AI SEO and ideas."}
             </p>
           ) : (
             <p className="text-sm">

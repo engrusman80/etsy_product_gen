@@ -75,6 +75,13 @@ const OPENROUTER: ProviderCost = {
 // remove.bg is an independent paid service (not an AI provider).
 const REMOVEBG_USD_PER_IMAGE = 0.2;
 
+// Claude Opus 5.5 ($4 / $20 per million tokens): ~2K tokens in, ~3K out with its thinking.
+const CLAUDE_SEO_USD = 0.07;
+const CLAUDE_MODEL = "Claude Opus 5.5";
+
+// Best-quality mockups use the Pro image model at 2K (Etsy asks for 2000px photos).
+const MOCKUP_2K: Partial<Record<Provider, number>> = { gemini: 0.134, openrouter: 0.14 };
+
 export const PROVIDERS: Record<Provider, ProviderCost> = {
   lovable: LOVABLE,
   openai: OPENAI,
@@ -96,6 +103,8 @@ export type EstimateInput = {
   fastImage?: boolean;
   /** The user uploaded their own artwork, so no design is generated. */
   uploaded?: boolean;
+  /** Claude writes the SEO text instead of the image provider. */
+  claudeText?: boolean;
 };
 
 export type LineItem = {
@@ -152,7 +161,13 @@ export function estimateRun(input: EstimateInput): Estimate {
     });
   };
 
-  addLine("SEO listing (title, description, tags)", seoCalls, "text");
+  addLine(
+    "SEO listing (title, description, tags)",
+    seoCalls,
+    "text",
+    input.claudeText ? CLAUDE_MODEL : undefined,
+    input.claudeText ? CLAUDE_SEO_USD : undefined,
+  );
   // OpenAI has one image tier; the fast mode only changes the Gemini-based providers.
   const fast = input.fastImage && provider !== "openai";
   addLine(
@@ -162,7 +177,14 @@ export function estimateRun(input: EstimateInput): Estimate {
     fast ? p.models.mockup : undefined,
     fast ? p.usd.mockup : undefined,
   );
-  addLine("Mockup composition", mockupCalls, "mockup");
+  const mockup2k = fast ? undefined : MOCKUP_2K[provider];
+  addLine(
+    mockup2k ? "Mockup photo (2K)" : "Mockup composition",
+    mockupCalls,
+    "mockup",
+    mockup2k ? "newest Gemini Pro Image (2K)" : undefined,
+    mockup2k,
+  );
   if (bgCalls > 0) {
     items.push({
       label: "Background removal (remove.bg API)",
@@ -179,7 +201,7 @@ export function estimateRun(input: EstimateInput): Estimate {
 
   return {
     provider,
-    providerLabel: p.label,
+    providerLabel: input.claudeText ? `Claude for text and ${p.label} for images` : p.label,
     freeNote: p.freeNote,
     billingUrl: p.billingUrl,
     items,

@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label";
 import { useTheme } from "@/hooks/use-theme";
 import {
   DEFAULT_SETTINGS,
+  PROVIDER_LABEL,
   activeProvider,
+  textProvider,
   useSettings,
   type AIProvider,
   type AdobeProvider,
   type Settings,
+  type TextProvider,
 } from "@/lib/settings-store";
 import { Moon, Store, Sun } from "lucide-react";
 import { etsyConnected, startEtsyConnect } from "@/lib/etsy/client";
@@ -24,7 +27,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-type KeyField = "geminiKey" | "openrouterKey" | "removeBgKey";
+type KeyField = "claudeKey" | "geminiKey" | "openrouterKey" | "removeBgKey";
 
 const KEYS: Array<{
   field: KeyField;
@@ -34,8 +37,18 @@ const KEYS: Array<{
   getLabel: string;
   usedFor: string;
   /** Provider header used to test the key, when it can be tested with a text call. */
-  check?: AIProvider;
+  check?: TextProvider;
 }> = [
+  {
+    field: "claudeKey",
+    label: "Anthropic Claude",
+    placeholder: "sk-ant-...",
+    getUrl: "https://console.anthropic.com/settings/keys",
+    getLabel: "console.anthropic.com",
+    usedFor:
+      "Claude Opus 5.5, the strongest writer here: crochet patterns with correct stitch counts, the PDF text and Etsy SEO (title, 13 tags, description). It makes no images, so keep a Gemini or OpenRouter key for thumbnails and files. Prepaid credits, no free tier; a Claude.ai Pro or Max plan does not include API use.",
+    check: "anthropic",
+  },
   {
     field: "geminiKey",
     label: "Google Gemini",
@@ -111,9 +124,32 @@ function SettingsPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 py-8 sm:px-6">
         <Panel
           title="AI provider"
-          desc="Used by the product generator and crochet studio for text and images."
+          desc="Text and images can come from different AIs, so each job uses the best one."
         >
-          <div className="grid gap-2 sm:grid-cols-2">
+          <Label htmlFor="text-ai">Text: crochet patterns, PDF text and Etsy SEO</Label>
+          <select
+            id="text-ai"
+            className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={settings.textAi}
+            onChange={(e) => update({ textAi: e.target.value as Settings["textAi"] })}
+          >
+            <option value="auto">Best available (Claude when its key is added)</option>
+            <option value="anthropic">Claude Opus 5.5</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Writing now with{" "}
+            <span className="font-medium text-foreground">
+              {PROVIDER_LABEL[textProvider(settings)]}
+            </span>
+            .
+            {!settings.claudeKey &&
+              " Add a Claude key below for the best patterns and SEO; without one the image provider writes the text."}
+          </p>
+
+          <p className="mt-5 text-sm font-medium">Images: thumbnails, mockups and 4K files</p>
+          <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
             {PROVIDERS.map((p) => {
               const on = settings.aiProvider === p.id;
               const hasKey = !!settings[p.key];
@@ -151,26 +187,28 @@ function SettingsPage() {
           )}
 
           <div className="mt-5">
-            <Label htmlFor="iq">Design image quality</Label>
+            <Label htmlFor="iq">Image quality</Label>
             <select
               id="iq"
               className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={settings.imageQuality}
               onChange={(e) => update({ imageQuality: e.target.value as Settings["imageQuality"] })}
             >
-              <option value="4k">Native 4K (best for prints, about $0.24 per design)</option>
-              <option value="fast">Fast and cheap (~1K upscaled to 4K, about $0.04)</option>
+              <option value="4k">
+                Best: native 4K designs (about $0.24) and 2K mockups (about $0.13 each)
+              </option>
+              <option value="fast">Fast and cheap: ~1K images upscaled (about $0.04 each)</option>
             </select>
             <p className="mt-1 text-xs text-muted-foreground">
-              Fast mode is fine for stickers, wallpapers and testing ideas. Use native 4K for wall
-              art and large prints.
+              Best gives sharp listing photos at the 2000px Etsy asks for. Fast mode is fine for
+              testing ideas.
             </p>
           </div>
         </Panel>
 
         <Panel
           title="API keys"
-          desc="Add only the ones you use. Each key is checked with a tiny free text request."
+          desc="Add only the ones you use. Check sends a tiny text request (free on Gemini, a fraction of a cent on Claude)."
         >
           <div className="divide-y divide-border">
             {KEYS.map((k) => (

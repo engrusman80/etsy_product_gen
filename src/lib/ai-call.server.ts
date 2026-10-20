@@ -1,13 +1,28 @@
+import Anthropic from "@anthropic-ai/sdk";
 import {
   geminiModel,
   geminiTextCandidates,
   rememberWorkingModel,
   replacementFromError,
 } from "@/lib/gemini-models.server";
-// Server-only AI dispatcher: routes calls to the default gateway, OpenAI, Google Gemini, or OpenRouter.
+// Server-only AI dispatcher: routes calls to the default gateway, OpenAI, Google Gemini, OpenRouter
+// or Anthropic Claude (text only).
 // The client sends `x-ai-provider` and `x-ai-key` headers; this module picks the right endpoint + body shape.
+// Text routes also read `x-text-provider` and `x-text-key`, so Claude can write while Gemini draws.
 
-export type Provider = "lovable" | "openai" | "gemini" | "openrouter" | "xai";
+export type Provider = "lovable" | "openai" | "gemini" | "openrouter" | "xai" | "anthropic";
+
+const PROVIDERS: Provider[] = ["openai", "gemini", "openrouter", "lovable", "xai", "anthropic"];
+
+const envKey = (p: Provider) =>
+  ({
+    lovable: process.env.LOVABLE_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    xai: process.env.XAI_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+  })[p];
 
 export function resolveProvider(request: Request): { provider: Provider; key: string | undefined } {
   const headerProvider = (request.headers.get("x-ai-provider") || "").toLowerCase().trim();
@@ -16,20 +31,23 @@ export function resolveProvider(request: Request): { provider: Provider; key: st
   const legacyKey = request.headers.get("x-lovable-key")?.trim();
 
   let provider: Provider = "lovable";
-  if (["openai", "gemini", "openrouter", "lovable", "xai"].includes(headerProvider)) {
+  if ((PROVIDERS as string[]).includes(headerProvider)) {
     provider = headerProvider as Provider;
   }
 
-  let key = headerKey || legacyKey || undefined;
-  if (!key) {
-    // Fall back to server env for the chosen provider
-    if (provider === "lovable") key = process.env.LOVABLE_API_KEY;
-    else if (provider === "openai") key = process.env.OPENAI_API_KEY;
-    else if (provider === "gemini") key = process.env.GEMINI_API_KEY;
-    else if (provider === "openrouter") key = process.env.OPENROUTER_API_KEY;
-    else if (provider === "xai") key = process.env.XAI_API_KEY;
-  }
+  // Fall back to server env for the chosen provider
+  const key = headerKey || legacyKey || envKey(provider);
   return { provider, key };
+}
+
+/** Provider for text-only routes (patterns, SEO, ideas): the text headers when sent, else the image ones. */
+export function resolveTextProvider(request: Request): {
+  provider: Provider;
+  key: string | undefined;
+} {
+  const p = (request.headers.get("x-text-provider") || "").toLowerCase().trim() as Provider;
+  if (!PROVIDERS.includes(p)) return resolveProvider(request);
+  return { provider: p, key: request.headers.get("x-text-key")?.trim() || envKey(p) };
 }
 
 export type TextOpts = {
@@ -53,6 +71,9 @@ export async function callText(opts: TextOpts): Promise<string> {
 
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
+      if (provider === "anthropic")
+        return await claudeText({ key, system, user, json, tier, maxTokens });
+
       if (provider === "gemini") {
         const generationConfig: Record<string, unknown> = { maxOutputTokens: maxTokens };
         if (json) generationConfig.responseMimeType = "application/json";
@@ -158,6 +179,83 @@ export async function callText(opts: TextOpts): Promise<string> {
     }
   }
   throw lastErr ?? new Error("callText failed");
+}
+
+/** Claude has no image model, so it only ever writes text. */
+const CLAUDE_MODEL = "claude-opus-5-5";
+
+async function claudeText(o: {
+  key: string;
+  system?: string;
+  user: string;
+  json?: boolean;
+  tier: "fast" | "pro";
+  maxTokens: number;
+}): Promise<string> {
+  // The SDK already retries rate limits and overloads with backoff, so callText must not repeat it.
+  const client = new Anthropic({ apiKey: o.key, maxRetries: 3 });
+  const system = o.json
+    ? `${o.system ?? ""}\n\nReply with only the JSON object: no code fences and no other text.`.trim()
+    : o.system;
+  let msg: Anthropic.Beta.BetaMessage;
+  try {
+    // Streamed so long patterns never hit the request timeout.
+    msg = await client.beta.messages
+      .stream({
+        model: CLAUDE_MODEL,
+        // Claude always thinks first and that counts toward max_tokens, so leave room for it.
+        max_tokens: o.maxTokens + (o.tier === "pro" ? 24000 : 8000),
+        // "high" where every stitch count must add up, Opus 5.5's own default elsewhere.
+        output_config: { effort: o.tier === "pro" ? "high" : "medium" },
+        ...(system ? { system } : {}),
+        messages: [{ role: "user", content: o.user }],
+        // If a safety check wrongly declines, Anthropic re-runs the request on its recommended model.
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      })
+      .finalMessage();
+  } catch (e) {
+    throw claudeError(e);
+  }
+  if (msg.stop_reason === "refusal")
+    throw withStatus(
+      new Error("Claude declined to write this one. Reword the idea and try again."),
+      422,
+    );
+  if (msg.stop_reason === "max_tokens")
+    throw withStatus(new Error("Claude's answer was cut off before it finished. Try again."), 502);
+  const text = msg.content
+    .map((b) => (b.type === "text" ? b.text : ""))
+    .join("")
+    .trim();
+  if (!text) throw withStatus(new Error("Claude returned an empty answer."), 502);
+  return o.json ? jsonPart(text) : text;
+}
+
+function withStatus(e: Error, status: number) {
+  return Object.assign(e, { status, noRetry: true });
+}
+
+function claudeError(e: unknown): Error {
+  if (e instanceof Anthropic.APIError) {
+    // The body is { error: { type, message } }; its message reads better than the SDK's summary.
+    const detail = (e.error as { error?: { message?: string } } | undefined)?.error?.message;
+    const text =
+      e instanceof Anthropic.AuthenticationError
+        ? "Claude rejected this API key. Copy it again from console.anthropic.com."
+        : e instanceof Anthropic.RateLimitError
+          ? `Claude rate limit reached, try again in a minute. (${detail ?? e.message})`
+          : `Claude: ${detail ?? e.message}`;
+    return withStatus(new Error(text), e.status ?? 500);
+  }
+  return withStatus(e instanceof Error ? e : new Error(String(e)), 500);
+}
+
+/** The JSON part of a reply, in case it comes wrapped in a code fence or a sentence. */
+function jsonPart(text: string): string {
+  const start = text.search(/[[{]/);
+  const end = Math.max(text.lastIndexOf("}"), text.lastIndexOf("]"));
+  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
 }
 
 export type ImageOpts = {

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
+import { resolveTextProvider, callText, statusFromError } from "@/lib/ai-call.server";
 import { IP_RULES, findProtectedTerm } from "@/lib/ip-guard";
 
 const MONTHS = [
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/crochet-suggest")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { provider, key } = resolveProvider(request);
+          const { provider, key } = resolveTextProvider(request);
           if (!key)
             return Response.json(
               { error: `Missing API key for ${provider}. Add it in Settings.` },
