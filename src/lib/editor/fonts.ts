@@ -59,9 +59,7 @@ export type FontDef = {
   spec?: string;
   /** True if the font is bundled via @fontsource (no network needed). */
   bundled?: boolean;
-  group:
-    | "Sans" | "Serif" | "Display" | "Script" | "Mono"
-    | "CJK" | "Indic" | "Arabic" | "Urdu";
+  group: "Sans" | "Serif" | "Display" | "Script" | "Mono" | "CJK" | "Indic" | "Arabic" | "Urdu";
   langs?: string;
 };
 
@@ -90,34 +88,121 @@ export const FONTS: FontDef[] = [
   // CDN-only (large multilingual families)
   { family: "Great Vibes", spec: "Great+Vibes", group: "Script" },
   { family: "Caveat", spec: "Caveat:wght@400;500;600;700", group: "Script" },
-  { family: "Cormorant Garamond", spec: "Cormorant+Garamond:wght@300;400;500;600;700", group: "Serif" },
-  { family: "Noto Sans SC", spec: "Noto+Sans+SC:wght@400;500;700;900", group: "CJK", langs: "中文" },
-  { family: "Noto Serif SC", spec: "Noto+Serif+SC:wght@400;500;700;900", group: "CJK", langs: "中文" },
-  { family: "Noto Sans JP", spec: "Noto+Sans+JP:wght@400;500;700;900", group: "CJK", langs: "日本語" },
-  { family: "Noto Serif JP", spec: "Noto+Serif+JP:wght@400;500;700;900", group: "CJK", langs: "日本語" },
-  { family: "Noto Sans KR", spec: "Noto+Sans+KR:wght@400;500;700;900", group: "CJK", langs: "한국어" },
-  { family: "Noto Sans Devanagari", spec: "Noto+Sans+Devanagari:wght@400;500;700;900", group: "Indic", langs: "हिन्दी" },
-  { family: "Noto Serif Devanagari", spec: "Noto+Serif+Devanagari:wght@400;500;700;900", group: "Indic", langs: "हिन्दी" },
-  { family: "Noto Sans Bengali", spec: "Noto+Sans+Bengali:wght@400;500;700;900", group: "Indic", langs: "বাংলা" },
-  { family: "Noto Sans Tamil", spec: "Noto+Sans+Tamil:wght@400;500;700;900", group: "Indic", langs: "தமிழ்" },
-  { family: "Noto Sans Telugu", spec: "Noto+Sans+Telugu:wght@400;500;700;900", group: "Indic", langs: "తెలుగు" },
-  { family: "Noto Sans Gujarati", spec: "Noto+Sans+Gujarati:wght@400;500;700;900", group: "Indic", langs: "ગુજરાતી" },
-  { family: "Noto Naskh Arabic", spec: "Noto+Naskh+Arabic:wght@400;500;600;700", group: "Arabic", langs: "العربية" },
-  { family: "Noto Nastaliq Urdu", spec: "Noto+Nastaliq+Urdu:wght@400;500;600;700", group: "Urdu", langs: "اُردُو" },
-  { family: "Noto Sans Thai", spec: "Noto+Sans+Thai:wght@400;500;700;900", group: "Sans", langs: "ไทย" },
-  { family: "Noto Sans Hebrew", spec: "Noto+Sans+Hebrew:wght@400;500;700;900", group: "Sans", langs: "עברית" },
+  {
+    family: "Cormorant Garamond",
+    spec: "Cormorant+Garamond:wght@300;400;500;600;700",
+    group: "Serif",
+  },
+  {
+    family: "Noto Sans SC",
+    spec: "Noto+Sans+SC:wght@400;500;700;900",
+    group: "CJK",
+    langs: "中文",
+  },
+  {
+    family: "Noto Serif SC",
+    spec: "Noto+Serif+SC:wght@400;500;700;900",
+    group: "CJK",
+    langs: "中文",
+  },
+  {
+    family: "Noto Sans JP",
+    spec: "Noto+Sans+JP:wght@400;500;700;900",
+    group: "CJK",
+    langs: "日本語",
+  },
+  {
+    family: "Noto Serif JP",
+    spec: "Noto+Serif+JP:wght@400;500;700;900",
+    group: "CJK",
+    langs: "日本語",
+  },
+  {
+    family: "Noto Sans KR",
+    spec: "Noto+Sans+KR:wght@400;500;700;900",
+    group: "CJK",
+    langs: "한국어",
+  },
+  {
+    family: "Noto Sans Devanagari",
+    spec: "Noto+Sans+Devanagari:wght@400;500;700;900",
+    group: "Indic",
+    langs: "हिन्दी",
+  },
+  {
+    family: "Noto Serif Devanagari",
+    spec: "Noto+Serif+Devanagari:wght@400;500;700;900",
+    group: "Indic",
+    langs: "हिन्दी",
+  },
+  {
+    family: "Noto Sans Bengali",
+    spec: "Noto+Sans+Bengali:wght@400;500;700;900",
+    group: "Indic",
+    langs: "বাংলা",
+  },
+  {
+    family: "Noto Sans Tamil",
+    spec: "Noto+Sans+Tamil:wght@400;500;700;900",
+    group: "Indic",
+    langs: "தமிழ்",
+  },
+  {
+    family: "Noto Sans Telugu",
+    spec: "Noto+Sans+Telugu:wght@400;500;700;900",
+    group: "Indic",
+    langs: "తెలుగు",
+  },
+  {
+    family: "Noto Sans Gujarati",
+    spec: "Noto+Sans+Gujarati:wght@400;500;700;900",
+    group: "Indic",
+    langs: "ગુજરાતી",
+  },
+  {
+    family: "Noto Naskh Arabic",
+    spec: "Noto+Naskh+Arabic:wght@400;500;600;700",
+    group: "Arabic",
+    langs: "العربية",
+  },
+  {
+    family: "Noto Nastaliq Urdu",
+    spec: "Noto+Nastaliq+Urdu:wght@400;500;600;700",
+    group: "Urdu",
+    langs: "اُردُو",
+  },
+  {
+    family: "Noto Sans Thai",
+    spec: "Noto+Sans+Thai:wght@400;500;700;900",
+    group: "Sans",
+    langs: "ไทย",
+  },
+  {
+    family: "Noto Sans Hebrew",
+    spec: "Noto+Sans+Hebrew:wght@400;500;700;900",
+    group: "Sans",
+    langs: "עברית",
+  },
 ];
 
 export const RTL_FAMILIES = new Set(
-  FONTS.filter((f) => f.group === "Arabic" || f.group === "Urdu" || f.family === "Noto Sans Hebrew").map((f) => f.family),
+  FONTS.filter(
+    (f) => f.group === "Arabic" || f.group === "Urdu" || f.family === "Noto Sans Hebrew",
+  ).map((f) => f.family),
 );
 
 let _cdnLoaded = false;
 export function injectFonts() {
   if (_cdnLoaded || typeof document === "undefined") return;
-  if (document.getElementById("editor-google-fonts")) { _cdnLoaded = true; return; }
+  if (document.getElementById("editor-google-fonts")) {
+    _cdnLoaded = true;
+    return;
+  }
   const cdnFonts = FONTS.filter((f) => !f.bundled && f.spec);
-  if (cdnFonts.length === 0) { _cdnLoaded = true; return; }
+  if (cdnFonts.length === 0) {
+    _cdnLoaded = true;
+    return;
+  }
   const families = cdnFonts.map((f) => `family=${f.spec}`).join("&");
   const link = document.createElement("link");
   link.id = "editor-google-fonts";

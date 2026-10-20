@@ -75,7 +75,8 @@ async function renderObjectToFullCanvas(
 function layerName(obj: FObject, idx: number): string {
   const t = obj.type ?? "object";
   // @ts-expect-error fabric text property
-  if (t === "i-text" || t === "text" || t === "textbox") return `Text — ${(obj.text ?? "").toString().slice(0, 24) || "text"}`;
+  if (t === "i-text" || t === "text" || t === "textbox")
+    return `Text — ${(obj.text ?? "").toString().slice(0, 24) || "text"}`;
   if (t === "image") return `Image ${idx + 1}`;
   if (t === "rect") return `Rectangle ${idx + 1}`;
   if (t === "circle") return `Circle ${idx + 1}`;
@@ -108,7 +109,8 @@ export async function exportObjectsAsPsd(opts: {
   // Background layer
   if (backgroundColor) {
     const bg = document.createElement("canvas");
-    bg.width = width; bg.height = height;
+    bg.width = width;
+    bg.height = height;
     const bctx = bg.getContext("2d")!;
     bctx.fillStyle = backgroundColor;
     bctx.fillRect(0, 0, width, height);
@@ -129,7 +131,8 @@ export async function exportObjectsAsPsd(opts: {
 
   // Composite preview = the full canvas
   const composite = document.createElement("canvas");
-  composite.width = width; composite.height = height;
+  composite.width = width;
+  composite.height = height;
   composite.getContext("2d")!.drawImage(canvas.lowerCanvasEl, 0, 0);
 
   const psd: Psd = {
@@ -168,7 +171,8 @@ export async function exportColorLayersAsPsd(opts: {
   const layers: Layer[] = [];
   if (backgroundColor) {
     const bg = document.createElement("canvas");
-    bg.width = width; bg.height = height;
+    bg.width = width;
+    bg.height = height;
     const bctx = bg.getContext("2d")!;
     bctx.fillStyle = backgroundColor;
     bctx.fillRect(0, 0, width, height);

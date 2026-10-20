@@ -78,10 +78,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Digital Product Ai Automation" },
-      { name: "description", content: "Digital Product Ai Automation - AI-powered Etsy & Adobe Stock studio" },
+      {
+        name: "description",
+        content: "Digital Product Ai Automation - AI-powered Etsy & Adobe Stock studio",
+      },
       { name: "author", content: "Muhammad Usman" },
       { property: "og:title", content: "Digital Product Ai Automation" },
-      { property: "og:description", content: "Digital Product Ai Automation - AI-powered Etsy & Adobe Stock studio" },
+      {
+        property: "og:description",
+        content: "Digital Product Ai Automation - AI-powered Etsy & Adobe Stock studio",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

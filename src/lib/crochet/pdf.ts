@@ -9,29 +9,29 @@ import type { CrochetPattern } from "./types";
 // A4 portrait, points
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN = 60;                 // generous safe margin — prevents right-edge trimming
-const RIGHT_PAD = 10;              // extra breathing room on the right of every text block
+const MARGIN = 60; // generous safe margin — prevents right-edge trimming
+const RIGHT_PAD = 10; // extra breathing room on the right of every text block
 const CONTENT_W = PAGE_W - MARGIN * 2;
 const TEXT_W = CONTENT_W - RIGHT_PAD;
-const BOTTOM_SAFE = MARGIN + 40;   // reserve for footer
+const BOTTOM_SAFE = MARGIN + 40; // reserve for footer
 
 // Palette (RGB)
 type RGB = readonly [number, number, number];
 const C: Record<string, RGB> = {
-  bg:         [252, 249, 244],   // warm cream paper
-  paper:      [255, 253, 248],
-  panel:      [250, 244, 236],
-  ink:        [46, 40, 56],
-  inkSoft:    [98, 88, 108],
-  accent:     [176, 92, 108],    // muted rose
+  bg: [252, 249, 244], // warm cream paper
+  paper: [255, 253, 248],
+  panel: [250, 244, 236],
+  ink: [46, 40, 56],
+  inkSoft: [98, 88, 108],
+  accent: [176, 92, 108], // muted rose
   accentSoft: [232, 210, 214],
-  gold:       [196, 158, 96],
-  sage:       [140, 160, 130],
-  rule:       [220, 210, 200],
-  chipBg:     [246, 236, 230],
-  chipInk:    [120, 78, 68],
-  kraft:      [214, 188, 148],   // handmade kraft tag
-  stitch:     [180, 150, 130],
+  gold: [196, 158, 96],
+  sage: [140, 160, 130],
+  rule: [220, 210, 200],
+  chipBg: [246, 236, 230],
+  chipInk: [120, 78, 68],
+  kraft: [214, 188, 148], // handmade kraft tag
+  stitch: [180, 150, 130],
 };
 
 type Ctx = { pdf: jsPDF; y: number; page: number };
@@ -222,18 +222,20 @@ function statCards(ctx: Ctx, cards: { label: string; value: string }[]) {
 
 /** Vector stitch-chart rounds. */
 function drawChart(ctx: Ctx, rounds: { label: string; symbols: string[] }[]) {
-  const cellW = 26, cellH = 22, gap = 4;
+  const cellW = 26,
+    cellH = 22,
+    gap = 4;
   const colors: Record<string, [number, number, number]> = {
-    ch:   [240, 235, 230],
-    sc:   [252, 224, 208],
-    hdc:  [248, 200, 172],
-    dc:   [240, 170, 138],
-    tr:   [220, 138, 108],
-    inc:  [206, 226, 200],
-    dec:  [238, 200, 202],
+    ch: [240, 235, 230],
+    sc: [252, 224, 208],
+    hdc: [248, 200, 172],
+    dc: [240, 170, 138],
+    tr: [220, 138, 108],
+    inc: [206, 226, 200],
+    dec: [238, 200, 202],
     slst: [216, 216, 236],
-    sl:   [216, 216, 236],
-    mr:   [246, 232, 190],
+    sl: [216, 216, 236],
+    mr: [246, 232, 190],
   };
   for (const r of rounds) {
     ensureSpace(ctx, cellH + 8);
@@ -285,7 +287,10 @@ function coverPage(ctx: Ctx, pattern: CrochetPattern, heroB64: string | null, sh
   p.rect(0, 8, PAGE_W, 1.4, "F");
 
   // Kraft "handmade" tag — top-right, tied with string
-  const tagW = 90, tagH = 34, tagX = PAGE_W - MARGIN - tagW, tagY = 30;
+  const tagW = 90,
+    tagH = 34,
+    tagX = PAGE_W - MARGIN - tagW,
+    tagY = 30;
   p.setFillColor(...C.kraft);
   p.roundedRect(tagX, tagY, tagW, tagH, 4, 4, "F");
   p.setDrawColor(...C.chipInk);
@@ -310,7 +315,16 @@ function coverPage(ctx: Ctx, pattern: CrochetPattern, heroB64: string | null, sh
       p.setFillColor(...C.accentSoft);
       p.roundedRect(MARGIN - 4, imgY - 4, imgW + 8, imgH + 8, 14, 14, "F");
       const fmt = detectImageFormat(heroB64);
-      p.addImage(`data:image/${fmt.toLowerCase()};base64,${heroB64}`, fmt, MARGIN, imgY, imgW, imgH, undefined, "SLOW");
+      p.addImage(
+        `data:image/${fmt.toLowerCase()};base64,${heroB64}`,
+        fmt,
+        MARGIN,
+        imgY,
+        imgW,
+        imgH,
+        undefined,
+        "SLOW",
+      );
       // hand-drawn corner ticks
       p.setDrawColor(...C.gold);
       p.setLineWidth(1);
@@ -323,7 +337,9 @@ function coverPage(ctx: Ctx, pattern: CrochetPattern, heroB64: string | null, sh
       drawCorner(MARGIN + imgW + 6, imgY - 6, -1, 1);
       drawCorner(MARGIN - 6, imgY + imgH + 6, 1, -1);
       drawCorner(MARGIN + imgW + 6, imgY + imgH + 6, -1, -1);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   } else {
     p.setFillColor(...C.paper);
     p.roundedRect(MARGIN, imgY, imgW, imgH, 12, 12, "F");
@@ -348,9 +364,15 @@ function coverPage(ctx: Ctx, pattern: CrochetPattern, heroB64: string | null, sh
   p.setFont("times", "italic");
   p.setFontSize(32);
   p.setTextColor(...C.ink);
-  const titleLines = p.splitTextToSize(pattern.title || "Crochet Pattern", CONTENT_W - 40) as string[];
+  const titleLines = p.splitTextToSize(
+    pattern.title || "Crochet Pattern",
+    CONTENT_W - 40,
+  ) as string[];
   let ty = flourY + 38;
-  for (const l of titleLines.slice(0, 2)) { p.text(l, PAGE_W / 2, ty, { align: "center" }); ty += 32; }
+  for (const l of titleLines.slice(0, 2)) {
+    p.text(l, PAGE_W / 2, ty, { align: "center" });
+    ty += 32;
+  }
 
   // Sub-caption
   p.setFont("helvetica", "bold");
@@ -378,7 +400,12 @@ function coverPage(ctx: Ctx, pattern: CrochetPattern, heroB64: string | null, sh
   p.setFont("times", "italic");
   p.setFontSize(9);
   p.setTextColor(...C.inkSoft);
-  p.text(shopName ? `An original design by ${shopName}` : "An original handmade crochet design", PAGE_W / 2, PAGE_H - 34, { align: "center" });
+  p.text(
+    shopName ? `An original design by ${shopName}` : "An original handmade crochet design",
+    PAGE_W / 2,
+    PAGE_H - 34,
+    { align: "center" },
+  );
 
   newPage(ctx);
 }
@@ -425,21 +452,33 @@ export async function buildCrochetPdf(
   if (pattern.subtitle) paragraph(ctx, pattern.subtitle, 11, 0, C.inkSoft);
   ctx.y += 4;
   statCards(ctx, [
-    { label: "Skill Level",   value: pattern.skillLevel || "\u2014" },
+    { label: "Skill Level", value: pattern.skillLevel || "\u2014" },
     { label: "Finished Size", value: pattern.finishedSize || "\u2014" },
-    { label: "Terms",         value: `${pattern.terminology} crochet` },
-    { label: "Gauge",         value: pattern.gauge || "\u2014" },
+    { label: "Terms", value: `${pattern.terminology} crochet` },
+    { label: "Gauge", value: pattern.gauge || "\u2014" },
   ]);
 
   // ---- Materials
   heading(ctx, "Materials & Tools");
-  if (pattern.materials?.yarn?.length)    { subHeading(ctx, "Yarn"); bulletList(ctx, pattern.materials.yarn); }
-  if (pattern.materials?.hooks?.length)   { subHeading(ctx, "Hooks"); bulletList(ctx, pattern.materials.hooks); }
-  if (pattern.materials?.notions?.length) { subHeading(ctx, "Notions"); bulletList(ctx, pattern.materials.notions); }
+  if (pattern.materials?.yarn?.length) {
+    subHeading(ctx, "Yarn");
+    bulletList(ctx, pattern.materials.yarn);
+  }
+  if (pattern.materials?.hooks?.length) {
+    subHeading(ctx, "Hooks");
+    bulletList(ctx, pattern.materials.hooks);
+  }
+  if (pattern.materials?.notions?.length) {
+    subHeading(ctx, "Notions");
+    bulletList(ctx, pattern.materials.notions);
+  }
 
   // ---- Abbreviations
   heading(ctx, `Abbreviations \u00b7 ${pattern.terminology} Terms`);
-  twoColList(ctx, (pattern.abbreviations ?? []).map((a) => ({ l: a.key, r: a.meaning })));
+  twoColList(
+    ctx,
+    (pattern.abbreviations ?? []).map((a) => ({ l: a.key, r: a.meaning })),
+  );
 
   if (pattern.specialStitches?.length) {
     heading(ctx, "Special Stitches");
@@ -485,7 +524,10 @@ export async function buildCrochetPdf(
       ctx.pdf.roundedRect(MARGIN, ctx.y, CONTENT_W, boxH, 6, 6, "FD");
       ctx.pdf.setTextColor(...C.chipInk);
       let ny = ctx.y + 15;
-      for (const l of wrapped) { ctx.pdf.text(l, MARGIN + 12, ny); ny += 12; }
+      for (const l of wrapped) {
+        ctx.pdf.text(l, MARGIN + 12, ny);
+        ny += 12;
+      }
       ctx.y += boxH + 8;
     }
     ctx.y += 10;
@@ -494,18 +536,32 @@ export async function buildCrochetPdf(
   // ---- Stitch chart
   if (pattern.chartRounds?.length) {
     heading(ctx, "Stitch Chart");
-    paragraph(ctx, "Round-by-round visual guide. Colors group stitch families for easy reading. Vector-drawn \u2014 infinitely sharp at any zoom.", 10, 0, C.inkSoft);
+    paragraph(
+      ctx,
+      "Round-by-round visual guide. Colors group stitch families for easy reading. Vector-drawn \u2014 infinitely sharp at any zoom.",
+      10,
+      0,
+      C.inkSoft,
+    );
     ctx.y += 4;
     drawChart(ctx, pattern.chartRounds);
   }
 
   // ---- Assembly & Care
-  if (pattern.assembly?.length) { heading(ctx, "Finishing & Assembly"); numberedSteps(ctx, pattern.assembly); }
-  if (pattern.care?.length)     { heading(ctx, "Care Instructions"); bulletList(ctx, pattern.care); }
+  if (pattern.assembly?.length) {
+    heading(ctx, "Finishing & Assembly");
+    numberedSteps(ctx, pattern.assembly);
+  }
+  if (pattern.care?.length) {
+    heading(ctx, "Care Instructions");
+    bulletList(ctx, pattern.care);
+  }
 
   // ---- License
   heading(ctx, "License");
-  const licenseText = pattern.copyright || "\u00a9 All rights reserved. For personal, non-commercial use only. Do not resell, redistribute, or share the pattern file. Finished items may be sold in small quantities crediting the designer.";
+  const licenseText =
+    pattern.copyright ||
+    "\u00a9 All rights reserved. For personal, non-commercial use only. Do not resell, redistribute, or share the pattern file. Finished items may be sold in small quantities crediting the designer.";
   ctx.pdf.setFont("helvetica", "italic");
   ctx.pdf.setFontSize(10);
   const wrapped = ctx.pdf.splitTextToSize(licenseText, CONTENT_W - 24) as string[];
@@ -517,13 +573,21 @@ export async function buildCrochetPdf(
   ctx.pdf.roundedRect(MARGIN, ctx.y, CONTENT_W, bh, 8, 8, "FD");
   ctx.pdf.setTextColor(...C.inkSoft);
   let ly = ctx.y + 17;
-  for (const l of wrapped) { ctx.pdf.text(l, MARGIN + 12, ly); ly += 13; }
+  for (const l of wrapped) {
+    ctx.pdf.text(l, MARGIN + 12, ly);
+    ly += 13;
+  }
   ctx.y += bh + 12;
   if (shopName) {
     ctx.pdf.setFont("times", "italic");
     ctx.pdf.setFontSize(10);
     ctx.pdf.setTextColor(...C.accent);
-    ctx.pdf.text(`Thank you for supporting ${shopName} \u2014 happy crocheting! \u2665`, PAGE_W / 2, ctx.y + 6, { align: "center" });
+    ctx.pdf.text(
+      `Thank you for supporting ${shopName} \u2014 happy crocheting! \u2665`,
+      PAGE_W / 2,
+      ctx.y + 6,
+      { align: "center" },
+    );
   }
 
   pageChrome(ctx, pattern);
@@ -535,6 +599,9 @@ export function patternHash(p: Pick<CrochetPattern, "title" | "sections">): stri
   const r = (p.sections?.[0]?.rows?.[0] || "").toLowerCase().replace(/\s+/g, " ").trim();
   let h = 0;
   const s = `${t}::${r}`;
-  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i);
+    h |= 0;
+  }
   return `h${(h >>> 0).toString(36)}`;
 }

@@ -11,10 +11,27 @@ import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server
 type Body = { prompt: string; assetType: "jpeg" | "png" | "svg" | "video" };
 
 const ADOBE_CATEGORIES = [
-  "Animals", "Buildings and Architecture", "Business", "Drinks", "The Environment",
-  "States of Mind", "Food", "Graphic Resources", "Hobbies and Leisure", "Industry",
-  "Landscapes", "Lifestyle", "People", "Plants and Flowers", "Culture and Religion",
-  "Science", "Social Issues", "Sports", "Technology", "Transport", "Travel",
+  "Animals",
+  "Buildings and Architecture",
+  "Business",
+  "Drinks",
+  "The Environment",
+  "States of Mind",
+  "Food",
+  "Graphic Resources",
+  "Hobbies and Leisure",
+  "Industry",
+  "Landscapes",
+  "Lifestyle",
+  "People",
+  "Plants and Flowers",
+  "Culture and Religion",
+  "Science",
+  "Social Issues",
+  "Sports",
+  "Technology",
+  "Transport",
+  "Travel",
 ];
 
 export const Route = createFileRoute("/api/adobe-stock-meta")({
@@ -29,7 +46,10 @@ export const Route = createFileRoute("/api/adobe-stock-meta")({
 
           const { provider, key } = resolveProvider(request);
           if (!key) {
-            return Response.json({ error: `Missing API key for ${provider}. Add it in Settings.` }, { status: 401 });
+            return Response.json(
+              { error: `Missing API key for ${provider}. Add it in Settings.` },
+              { status: 401 },
+            );
           }
 
           const isVideo = assetType === "video";
@@ -71,10 +91,21 @@ ${prompt}
 
 Remember: maximise commercial demand. Output ONLY the JSON object.`;
 
-          const raw = await callText({ provider, key, system, user, json: true, tier: "fast", maxTokens: 8192 });
+          const raw = await callText({
+            provider,
+            key,
+            system,
+            user,
+            json: true,
+            tier: "fast",
+            maxTokens: 8192,
+          });
 
           // Strip any accidental fences and parse
-          const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+          const cleaned = raw
+            .replace(/^```(?:json)?\s*/i, "")
+            .replace(/```\s*$/i, "")
+            .trim();
           let parsed: {
             title?: string;
             filename?: string;
@@ -92,19 +123,30 @@ Remember: maximise commercial demand. Output ONLY the JSON object.`;
           }
 
           // Normalise + safety-clamp
-          const title = String(parsed.title || "").slice(0, 200).trim();
-          const description = String(parsed.description || "").slice(0, 250).trim();
-          const filename = String(parsed.filename || "")
-            .toLowerCase()
-            .replace(/\.[a-z0-9]{2,4}$/i, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .slice(0, 80) || "adobe-stock-asset";
+          const title = String(parsed.title || "")
+            .slice(0, 200)
+            .trim();
+          const description = String(parsed.description || "")
+            .slice(0, 250)
+            .trim();
+          const filename =
+            String(parsed.filename || "")
+              .toLowerCase()
+              .replace(/\.[a-z0-9]{2,4}$/i, "")
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "")
+              .slice(0, 80) || "adobe-stock-asset";
 
           let keywords: string[] = [];
           if (Array.isArray(parsed.keywords)) {
             keywords = parsed.keywords
-              .map((k) => String(k).toLowerCase().trim().replace(/[^a-z0-9 \-]/g, "").replace(/\s+/g, " "))
+              .map((k) =>
+                String(k)
+                  .toLowerCase()
+                  .trim()
+                  .replace(/[^a-z0-9 \-]/g, "")
+                  .replace(/\s+/g, " "),
+              )
               .filter((k) => k.length >= 2 && k.length <= 40);
             // de-dupe preserving order
             const seen = new Set<string>();

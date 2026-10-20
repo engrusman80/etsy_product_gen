@@ -14,7 +14,7 @@ Example:
 
 4. Etsy Image without background, with background. (in different resolutions and convert all these to svg, pdf, png, jpg)
 
-5. Mockups for this image, which will be more realistic, on different T shirts, mugs, wall frames etc, at least 5 to 8 mockups.  And in the last when complete all these, I will download in zip folder.
+5. Mockups for this image, which will be more realistic, on different T shirts, mugs, wall frames etc, at least 5 to 8 mockups. And in the last when complete all these, I will download in zip folder.
 6. Strictly restrict copyrighted contents.
 
 System Ka Flow
@@ -26,28 +26,29 @@ User input:
 
 Phir system automatically:
 
- Etsy SEO title generate kare
+Etsy SEO title generate kare
 
- Etsy SEO description generate kare
+Etsy SEO description generate kare
 
- Etsy tags generate kare
+Etsy tags generate kare
 
- AI image create kare
+AI image create kare
 
- Background remove kare
+Background remove kare
 
- PNG/JPG/SVG/PDF export kare
+PNG/JPG/SVG/PDF export kare
 
- Mockups generate kare
+Mockups generate kare
 
- ZIP file banaye
+ZIP file banaye
 
- Download button de
-_____________________________
+Download button de
 
-All these will be used for commercial use, I will upload all these to my etsy account for selling. 
+---
 
-____________________
+All these will be used for commercial use, I will upload all these to my etsy account for selling.
+
+---
 
 you can use remove background api key from this website or you can choose any other better option:
 https://www.remove.bg/
@@ -55,8 +56,6 @@ https://www.remove.bg/
 
 Open API Key is:
 <OPENAI_API_KEY: set in app Settings or .env>
-
-
 
 ## Development
 

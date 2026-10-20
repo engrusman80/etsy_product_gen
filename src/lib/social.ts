@@ -1,12 +1,15 @@
 export type SocialPlatform = "instagram" | "pinterest" | "facebook" | "etsy" | "website";
 
 function stripProto(s: string) {
-  return s.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
+  return s
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/+$/, "");
 }
 
 export function normalizeSocial(
   value: string | undefined,
-  platform: SocialPlatform
+  platform: SocialPlatform,
 ): { url: string; display: string } | null {
   if (!value) return null;
   const raw = value.trim();

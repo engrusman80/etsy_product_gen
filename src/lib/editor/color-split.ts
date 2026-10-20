@@ -50,13 +50,19 @@ function sampleCanvas(img: HTMLImageElement, maxDim: number) {
   const w = Math.max(1, Math.round(img.width * scale));
   const h = Math.max(1, Math.round(img.height * scale));
   const c = document.createElement("canvas");
-  c.width = w; c.height = h;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext("2d", { willReadFrequently: true })!;
   ctx.drawImage(img, 0, 0, w, h);
   return ctx.getImageData(0, 0, w, h);
 }
 
-function kmeans(pixels: Uint8ClampedArray, k: number, iterations: number, alphaThreshold: number): RGB[] {
+function kmeans(
+  pixels: Uint8ClampedArray,
+  k: number,
+  iterations: number,
+  alphaThreshold: number,
+): RGB[] {
   // Collect opaque samples
   const samples: RGB[] = [];
   for (let i = 0; i < pixels.length; i += 4) {
@@ -81,7 +87,13 @@ function kmeans(pixels: Uint8ClampedArray, k: number, iterations: number, alphaT
     if (total === 0) break;
     let r = Math.random() * total;
     let idx = 0;
-    for (let i = 0; i < dists.length; i++) { r -= dists[i]; if (r <= 0) { idx = i; break; } }
+    for (let i = 0; i < dists.length; i++) {
+      r -= dists[i];
+      if (r <= 0) {
+        idx = i;
+        break;
+      }
+    }
     centroids.push(samples[idx]);
   }
 
@@ -89,25 +101,36 @@ function kmeans(pixels: Uint8ClampedArray, k: number, iterations: number, alphaT
   for (let it = 0; it < iterations; it++) {
     const sums = centroids.map(() => [0, 0, 0, 0]); // r,g,b,count
     for (const p of samples) {
-      let best = 0, bestD = Infinity;
+      let best = 0,
+        bestD = Infinity;
       for (let i = 0; i < centroids.length; i++) {
         const c = centroids[i];
         const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
-        if (d < bestD) { bestD = d; best = i; }
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
       }
       const s = sums[best];
-      s[0] += p[0]; s[1] += p[1]; s[2] += p[2]; s[3]++;
+      s[0] += p[0];
+      s[1] += p[1];
+      s[2] += p[2];
+      s[3]++;
     }
     for (let i = 0; i < centroids.length; i++) {
       const s = sums[i];
-      if (s[3] > 0) centroids[i] = [Math.round(s[0] / s[3]), Math.round(s[1] / s[3]), Math.round(s[2] / s[3])];
+      if (s[3] > 0)
+        centroids[i] = [Math.round(s[0] / s[3]), Math.round(s[1] / s[3]), Math.round(s[2] / s[3])];
     }
   }
   return centroids;
 }
 
 /** Split an image into K color layers. Each layer is a transparent PNG. */
-export async function splitImageByColor(src: string, opts: SplitOptions = {}): Promise<ColorLayer[]> {
+export async function splitImageByColor(
+  src: string,
+  opts: SplitOptions = {},
+): Promise<ColorLayer[]> {
   const k = Math.max(2, Math.min(16, opts.k ?? 6));
   const sampleSize = opts.sampleSize ?? 240;
   const alphaThreshold = opts.alphaThreshold ?? 8;
@@ -119,9 +142,11 @@ export async function splitImageByColor(src: string, opts: SplitOptions = {}): P
   if (centroids.length === 0) return [];
 
   // Full-resolution pass
-  const fullW = img.width, fullH = img.height;
+  const fullW = img.width,
+    fullH = img.height;
   const fullCanvas = document.createElement("canvas");
-  fullCanvas.width = fullW; fullCanvas.height = fullH;
+  fullCanvas.width = fullW;
+  fullCanvas.height = fullH;
   const fctx = fullCanvas.getContext("2d", { willReadFrequently: true })!;
   fctx.drawImage(img, 0, 0);
   const full = fctx.getImageData(0, 0, fullW, fullH);
@@ -136,15 +161,24 @@ export async function splitImageByColor(src: string, opts: SplitOptions = {}): P
     const a = data[i + 3];
     if (a < alphaThreshold) continue;
     totalOpaque++;
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-    let best = 0, bestD = Infinity;
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+    let best = 0,
+      bestD = Infinity;
     for (let j = 0; j < centroids.length; j++) {
       const c = centroids[j];
       const d = (r - c[0]) ** 2 + (g - c[1]) ** 2 + (b - c[2]) ** 2;
-      if (d < bestD) { bestD = d; best = j; }
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
     }
     const buf = layerBufs[best];
-    buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = a;
+    buf[i] = r;
+    buf[i + 1] = g;
+    buf[i + 2] = b;
+    buf[i + 3] = a;
     counts[best]++;
   }
 
@@ -153,7 +187,8 @@ export async function splitImageByColor(src: string, opts: SplitOptions = {}): P
   for (let j = 0; j < centroids.length; j++) {
     if (counts[j] === 0) continue;
     const c = document.createElement("canvas");
-    c.width = fullW; c.height = fullH;
+    c.width = fullW;
+    c.height = fullH;
     const cctx = c.getContext("2d")!;
     const id = new ImageData(layerBufs[j], fullW, fullH);
     cctx.putImageData(id, 0, 0);

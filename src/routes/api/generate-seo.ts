@@ -2,10 +2,32 @@ import { createFileRoute } from "@tanstack/react-router";
 import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
 
 const BLOCKED = [
-  "disney","marvel","pokemon","pokémon","nintendo","star wars","harry potter",
-  "nike","adidas","gucci","louis vuitton","chanel","prada","supreme",
-  "coca cola","pepsi","apple inc","mickey mouse","minnie mouse","batman",
-  "superman","spider-man","spiderman","taylor swift","beyonce","drake",
+  "disney",
+  "marvel",
+  "pokemon",
+  "pokémon",
+  "nintendo",
+  "star wars",
+  "harry potter",
+  "nike",
+  "adidas",
+  "gucci",
+  "louis vuitton",
+  "chanel",
+  "prada",
+  "supreme",
+  "coca cola",
+  "pepsi",
+  "apple inc",
+  "mickey mouse",
+  "minnie mouse",
+  "batman",
+  "superman",
+  "spider-man",
+  "spiderman",
+  "taylor swift",
+  "beyonce",
+  "drake",
 ];
 
 function checkIP(text: string): string | null {
@@ -25,12 +47,15 @@ type Shop = {
 };
 
 function stripProto(s: string) {
-  return s.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
+  return s
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/+$/, "");
 }
 
 export function normalizeSocial(
   value: string | undefined,
-  platform: "instagram" | "pinterest" | "facebook" | "etsy" | "website"
+  platform: "instagram" | "pinterest" | "facebook" | "etsy" | "website",
 ): { url: string; display: string } | null {
   if (!value) return null;
   const raw = value.trim();
@@ -141,13 +166,20 @@ export const Route = createFileRoute("/api/generate-seo")({
           }
           const violated = checkIP(idea);
           if (violated) {
-            return Response.json({
-              error: `Your idea references "${violated}", which is a protected brand/IP. Etsy prohibits unlicensed use. Please rewrite without trademarked names.`,
-            }, { status: 400 });
+            return Response.json(
+              {
+                error: `Your idea references "${violated}", which is a protected brand/IP. Etsy prohibits unlicensed use. Please rewrite without trademarked names.`,
+              },
+              { status: 400 },
+            );
           }
 
           const { provider, key } = resolveProvider(request);
-          if (!key) return Response.json({ error: `Missing API key for ${provider}. Add it in Settings.` }, { status: 401 });
+          if (!key)
+            return Response.json(
+              { error: `Missing API key for ${provider}. Add it in Settings.` },
+              { status: 401 },
+            );
 
           const system = `You are an Etsy SEO expert writing for a digital download / print-on-demand listing. Follow Etsy 2025 guidelines strictly.
 
@@ -169,22 +201,37 @@ Do not include social links or copyright — the caller appends those. No HTML.`
 
           let content: string;
           try {
-            content = await callText({ provider, key, system, user: `Product idea: ${idea}`, json: true });
+            content = await callText({
+              provider,
+              key,
+              system,
+              user: `Product idea: ${idea}`,
+              json: true,
+            });
           } catch (e) {
             const status = statusFromError(e);
             const msg = (e as Error).message;
-            if (status === 429) return Response.json({ error: "Rate limit reached. Try again shortly." }, { status });
-            if (status === 402) return Response.json({ error: "AI credits exhausted." }, { status });
-            if (status === 401) return Response.json({ error: "Invalid API key. Check Settings." }, { status });
+            if (status === 429)
+              return Response.json({ error: "Rate limit reached. Try again shortly." }, { status });
+            if (status === 402)
+              return Response.json({ error: "AI credits exhausted." }, { status });
+            if (status === 401)
+              return Response.json({ error: "Invalid API key. Check Settings." }, { status });
             return Response.json({ error: msg }, { status });
           }
           // Strip ```json fences if present (Gemini direct sometimes wraps despite mime type)
-          const cleaned = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+          const cleaned = content
+            .trim()
+            .replace(/^```(?:json)?\s*/i, "")
+            .replace(/```$/i, "")
+            .trim();
           const parsed = JSON.parse(cleaned || "{}");
 
           const tags: string[] = Array.isArray(parsed.tags) ? parsed.tags : [];
           const cleanTags = tags
-            .map((t: string) => String(t).toLowerCase().trim().replace(/,/g, " ").replace(/\s+/g, " "))
+            .map((t: string) =>
+              String(t).toLowerCase().trim().replace(/,/g, " ").replace(/\s+/g, " "),
+            )
             .filter((t: string) => t.length > 0 && t.length <= 20)
             .slice(0, 13);
 

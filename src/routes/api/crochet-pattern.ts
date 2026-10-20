@@ -2,9 +2,26 @@ import { createFileRoute } from "@tanstack/react-router";
 import { resolveProvider, callText, statusFromError } from "@/lib/ai-call.server";
 
 const BLOCKED = [
-  "disney","marvel","pokemon","pokémon","nintendo","star wars","harry potter",
-  "hello kitty","sanrio","minion","shrek","frozen","elsa","mickey mouse",
-  "spider-man","spiderman","batman","superman","pikachu","mario",
+  "disney",
+  "marvel",
+  "pokemon",
+  "pokémon",
+  "nintendo",
+  "star wars",
+  "harry potter",
+  "hello kitty",
+  "sanrio",
+  "minion",
+  "shrek",
+  "frozen",
+  "elsa",
+  "mickey mouse",
+  "spider-man",
+  "spiderman",
+  "batman",
+  "superman",
+  "pikachu",
+  "mario",
 ];
 
 function checkIP(text: string): string | null {
@@ -19,7 +36,10 @@ export const Route = createFileRoute("/api/crochet-pattern")({
       POST: async ({ request }) => {
         try {
           const body = (await request.json()) as {
-            idea: string; seed?: string; terminology?: "US" | "UK"; avoidTitles?: string[];
+            idea: string;
+            seed?: string;
+            terminology?: "US" | "UK";
+            avoidTitles?: string[];
           };
           const { idea, seed, terminology = "US", avoidTitles = [] } = body;
           if (!idea || idea.trim().length < 3) {
@@ -27,16 +47,26 @@ export const Route = createFileRoute("/api/crochet-pattern")({
           }
           const violated = checkIP(idea);
           if (violated) {
-            return Response.json({
-              error: `Idea references "${violated}" (trademarked/IP). Rewrite without brands or copyrighted characters.`,
-            }, { status: 400 });
+            return Response.json(
+              {
+                error: `Idea references "${violated}" (trademarked/IP). Rewrite without brands or copyrighted characters.`,
+              },
+              { status: 400 },
+            );
           }
 
           const { provider, key } = resolveProvider(request);
-          if (!key) return Response.json({ error: `Missing API key for ${provider}. Add it in Settings.` }, { status: 401 });
+          if (!key)
+            return Response.json(
+              { error: `Missing API key for ${provider}. Add it in Settings.` },
+              { status: 401 },
+            );
 
           const avoidClause = avoidTitles.length
-            ? `\n\nAvoid these already-generated titles (produce a distinctly DIFFERENT title and construction approach):\n${avoidTitles.slice(0, 20).map((t, i) => `${i + 1}. ${t}`).join("\n")}`
+            ? `\n\nAvoid these already-generated titles (produce a distinctly DIFFERENT title and construction approach):\n${avoidTitles
+                .slice(0, 20)
+                .map((t, i) => `${i + 1}. ${t}`)
+                .join("\n")}`
             : "";
 
           const system = `You are a professional crochet pattern designer publishing on Etsy. Write ORIGINAL, PROFESSIONAL, TECHNICALLY-CORRECT patterns using ${terminology} crochet terminology.
@@ -91,14 +121,28 @@ Uniqueness seed: ${seed ?? Math.random().toString(36).slice(2)}.
 Make it distinctly different from typical stock crochet patterns for this subject — pick an unusual construction (top-down vs bottom-up, seamless vs paneled, unusual color-block, unusual stitch combo). ${terminology} terminology.`;
 
           const content = await callText({
-            provider, key, system, user, json: true,
-            tier: "pro",         // higher quality — patterns must be technically correct
-            maxTokens: 16000,    // patterns are long
+            provider,
+            key,
+            system,
+            user,
+            json: true,
+            tier: "pro", // higher quality — patterns must be technically correct
+            maxTokens: 16000, // patterns are long
           });
-          const cleaned = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+          const cleaned = content
+            .trim()
+            .replace(/^```(?:json)?\s*/i, "")
+            .replace(/```$/i, "")
+            .trim();
           let parsed: Record<string, unknown>;
-          try { parsed = JSON.parse(cleaned) as Record<string, unknown>; }
-          catch { return Response.json({ error: "AI returned invalid pattern JSON. Retry." }, { status: 502 }); }
+          try {
+            parsed = JSON.parse(cleaned) as Record<string, unknown>;
+          } catch {
+            return Response.json(
+              { error: "AI returned invalid pattern JSON. Retry." },
+              { status: 502 },
+            );
+          }
 
           return Response.json({ pattern: { ...parsed, seed } });
         } catch (e) {

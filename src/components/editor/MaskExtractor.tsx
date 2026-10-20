@@ -6,7 +6,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Brush, Eraser, MousePointer2, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -58,25 +65,30 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
     img.onload = () => {
       if (cancelled) return;
       imgRef.current = img;
-      const w = img.naturalWidth, h = img.naturalHeight;
+      const w = img.naturalWidth,
+        h = img.naturalHeight;
       setImgSize({ w, h });
       const s = Math.min(1, DISPLAY_MAX / Math.max(w, h));
-      const dw = Math.round(w * s), dh = Math.round(h * s);
+      const dw = Math.round(w * s),
+        dh = Math.round(h * s);
       setDisplaySize({ w: dw, h: dh });
 
       // Draw display
       const bc = baseCanvasRef.current!;
-      bc.width = dw; bc.height = dh;
+      bc.width = dw;
+      bc.height = dh;
       bc.getContext("2d")!.drawImage(img, 0, 0, dw, dh);
 
       // Init mask overlay
       const mc = maskCanvasRef.current!;
-      mc.width = dw; mc.height = dh;
+      mc.width = dw;
+      mc.height = dh;
       mc.getContext("2d")!.clearRect(0, 0, dw, dh);
 
       // Read full-res pixels once
       const full = document.createElement("canvas");
-      full.width = w; full.height = h;
+      full.width = w;
+      full.height = h;
       const fctx = full.getContext("2d", { willReadFrequently: true })!;
       fctx.drawImage(img, 0, 0);
       pixelsRef.current = fctx.getImageData(0, 0, w, h).data;
@@ -85,7 +97,9 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
     };
     img.onerror = () => alert("Could not load this image for masking. (Cross-origin blocked?)");
     img.src = src;
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, src]);
 
   const repaintOverlay = () => {
@@ -93,7 +107,8 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
     const size = imgSize;
     if (!mask || !size) return;
     const mc = maskCanvasRef.current!;
-    const dw = mc.width, dh = mc.height;
+    const dw = mc.width,
+      dh = mc.height;
     const ctx = mc.getContext("2d")!;
     const out = ctx.createImageData(dw, dh);
     // Downsample mask for display
@@ -104,7 +119,10 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
         const m = mask[srcY * size.w + srcX];
         const i = (y * dw + x) * 4;
         if (m) {
-          out.data[i] = 255; out.data[i + 1] = 64; out.data[i + 2] = 64; out.data[i + 3] = 120;
+          out.data[i] = 255;
+          out.data[i + 1] = 64;
+          out.data[i + 2] = 64;
+          out.data[i + 3] = 120;
         }
       }
     }
@@ -114,17 +132,24 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
 
   // Magic wand flood fill from full-res pixel
   const magicWand = (px: number, py: number) => {
-    const size = imgSize; const data = pixelsRef.current; const mask = maskBufRef.current;
+    const size = imgSize;
+    const data = pixelsRef.current;
+    const mask = maskBufRef.current;
     if (!size || !data || !mask) return;
-    const w = size.w, h = size.h;
+    const w = size.w,
+      h = size.h;
     if (px < 0 || py < 0 || px >= w || py >= h) return;
     const startIdx = (py * w + px) * 4;
-    const tr = data[startIdx], tg = data[startIdx + 1], tb = data[startIdx + 2];
+    const tr = data[startIdx],
+      tg = data[startIdx + 1],
+      tb = data[startIdx + 2];
     const tol2 = tolerance * tolerance * 3; // squared distance budget
 
     if (!contiguous) {
       for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-        const dr = data[i] - tr, dg = data[i + 1] - tg, db = data[i + 2] - tb;
+        const dr = data[i] - tr,
+          dg = data[i + 1] - tg,
+          db = data[i + 2] - tb;
         if (dr * dr + dg * dg + db * db <= tol2 && data[i + 3] > 8) mask[p] = 1;
       }
       repaintOverlay();
@@ -136,33 +161,44 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
     const maxPixels = w * h;
     let visited = 0;
     while (stack.length && visited < maxPixels) {
-      const y = stack.pop()!; const x = stack.pop()!;
+      const y = stack.pop()!;
+      const x = stack.pop()!;
       if (x < 0 || y < 0 || x >= w || y >= h) continue;
       const p = y * w + x;
       if (mask[p]) continue;
       const i = p * 4;
       if (data[i + 3] < 8) continue;
-      const dr = data[i] - tr, dg = data[i + 1] - tg, db = data[i + 2] - tb;
+      const dr = data[i] - tr,
+        dg = data[i + 1] - tg,
+        db = data[i + 2] - tb;
       if (dr * dr + dg * dg + db * db > tol2) continue;
-      mask[p] = 1; visited++;
-      stack.push(x + 1, y); stack.push(x - 1, y);
-      stack.push(x, y + 1); stack.push(x, y - 1);
+      mask[p] = 1;
+      visited++;
+      stack.push(x + 1, y);
+      stack.push(x - 1, y);
+      stack.push(x, y + 1);
+      stack.push(x, y - 1);
     }
     repaintOverlay();
   };
 
   // Brush paint/erase at full-res circle
   const paintCircle = (px: number, py: number, erase: boolean) => {
-    const size = imgSize; const mask = maskBufRef.current;
+    const size = imgSize;
+    const mask = maskBufRef.current;
     if (!size || !mask) return;
-    const radiusFull = Math.max(1, Math.round((brushSize / 2) / scale));
-    const w = size.w, h = size.h;
-    const x0 = Math.max(0, px - radiusFull), x1 = Math.min(w - 1, px + radiusFull);
-    const y0 = Math.max(0, py - radiusFull), y1 = Math.min(h - 1, py + radiusFull);
+    const radiusFull = Math.max(1, Math.round(brushSize / 2 / scale));
+    const w = size.w,
+      h = size.h;
+    const x0 = Math.max(0, px - radiusFull),
+      x1 = Math.min(w - 1, px + radiusFull);
+    const y0 = Math.max(0, py - radiusFull),
+      y1 = Math.min(h - 1, py + radiusFull);
     const r2 = radiusFull * radiusFull;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        const dx = x - px, dy = y - py;
+        const dx = x - px,
+          dy = y - py;
         if (dx * dx + dy * dy <= r2) mask[y * w + x] = erase ? 0 : 1;
       }
     }
@@ -174,9 +210,13 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
 
   const toFullCoords = (e: React.PointerEvent) => {
     const rect = interactRef.current!.getBoundingClientRect();
-    const dx = e.clientX - rect.left, dy = e.clientY - rect.top;
+    const dx = e.clientX - rect.left,
+      dy = e.clientY - rect.top;
     const size = imgSize!;
-    return { x: Math.floor(dx / displaySize.w * size.w), y: Math.floor(dy / displaySize.h * size.h) };
+    return {
+      x: Math.floor((dx / displaySize.w) * size.w),
+      y: Math.floor((dy / displaySize.h) * size.h),
+    };
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -184,7 +224,10 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
     interactRef.current!.setPointerCapture(e.pointerId);
     isDownRef.current = true;
     const { x, y } = toFullCoords(e);
-    if (mode === "wand") { magicWand(x, y); return; }
+    if (mode === "wand") {
+      magicWand(x, y);
+      return;
+    }
     paintCircle(x, y, mode === "erase");
     lastPtRef.current = { x, y };
     repaintOverlay();
@@ -206,44 +249,65 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
   const onPointerUp = (e: React.PointerEvent) => {
     isDownRef.current = false;
     lastPtRef.current = null;
-    try { interactRef.current!.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    try {
+      interactRef.current!.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
   };
 
   const clearMask = () => {
-    const m = maskBufRef.current; if (!m) return;
-    m.fill(0); repaintOverlay();
+    const m = maskBufRef.current;
+    if (!m) return;
+    m.fill(0);
+    repaintOverlay();
   };
 
   const invertMask = () => {
-    const m = maskBufRef.current; if (!m) return;
+    const m = maskBufRef.current;
+    if (!m) return;
     for (let i = 0; i < m.length; i++) m[i] = m[i] ? 0 : 1;
     repaintOverlay();
   };
 
   const doExtract = () => {
-    const size = imgSize; const data = pixelsRef.current; const mask = maskBufRef.current;
+    const size = imgSize;
+    const data = pixelsRef.current;
+    const mask = maskBufRef.current;
     if (!size || !data || !mask) return;
-    if (!mask.some((v) => v > 0)) { alert("Mask is empty. Paint or wand-click something first."); return; }
-    const w = size.w, h = size.h;
+    if (!mask.some((v) => v > 0)) {
+      alert("Mask is empty. Paint or wand-click something first.");
+      return;
+    }
+    const w = size.w,
+      h = size.h;
     const layerBuf = new Uint8ClampedArray(data.length);
     const cutBuf = cutFromSource ? new Uint8ClampedArray(data.length) : null;
     for (let p = 0, i = 0; p < mask.length; p++, i += 4) {
       if (mask[p]) {
-        layerBuf[i] = data[i]; layerBuf[i + 1] = data[i + 1]; layerBuf[i + 2] = data[i + 2]; layerBuf[i + 3] = data[i + 3];
+        layerBuf[i] = data[i];
+        layerBuf[i + 1] = data[i + 1];
+        layerBuf[i + 2] = data[i + 2];
+        layerBuf[i + 3] = data[i + 3];
         // cut leaves these pixels transparent
       } else if (cutBuf) {
-        cutBuf[i] = data[i]; cutBuf[i + 1] = data[i + 1]; cutBuf[i + 2] = data[i + 2]; cutBuf[i + 3] = data[i + 3];
+        cutBuf[i] = data[i];
+        cutBuf[i + 1] = data[i + 1];
+        cutBuf[i + 2] = data[i + 2];
+        cutBuf[i + 3] = data[i + 3];
       }
     }
     const layerCanvas = document.createElement("canvas");
-    layerCanvas.width = w; layerCanvas.height = h;
+    layerCanvas.width = w;
+    layerCanvas.height = h;
     layerCanvas.getContext("2d")!.putImageData(new ImageData(layerBuf, w, h), 0, 0);
     const layerDataUrl = layerCanvas.toDataURL("image/png");
 
     let cutSourceDataUrl: string | undefined;
     if (cutBuf) {
       const c = document.createElement("canvas");
-      c.width = w; c.height = h;
+      c.width = w;
+      c.height = h;
       c.getContext("2d")!.putImageData(new ImageData(cutBuf, w, h), 0, 0);
       cutSourceDataUrl = c.toDataURL("image/png");
     }
@@ -259,14 +323,19 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
             <Wand2 className="h-4 w-4" /> Mask &amp; extract
           </DialogTitle>
           <DialogDescription>
-            Magic wand picks similar colors. Brush paints / erases manually. Click <strong>Extract</strong> to turn the red area into a new editable layer.
+            Magic wand picks similar colors. Brush paints / erases manually. Click{" "}
+            <strong>Extract</strong> to turn the red area into a new editable layer.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 md:grid-cols-[1fr_280px]">
           <div className="flex items-center justify-center rounded-md border border-border bg-[conic-gradient(at_top_left,_#e5e7eb_25%,_transparent_25%,_transparent_50%,_#e5e7eb_50%,_#e5e7eb_75%,_transparent_75%)] bg-[length:20px_20px] p-3">
-            <div ref={interactRef}
-              onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+            <div
+              ref={interactRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
               className="relative cursor-crosshair touch-none select-none"
               style={{ width: displaySize.w, height: displaySize.h }}
             >
@@ -277,15 +346,29 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
 
           <div className="space-y-4">
             <div>
-              <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tool</Label>
+              <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Tool
+              </Label>
               <div className="grid grid-cols-3 gap-1">
-                <Button size="sm" variant={mode === "wand" ? "default" : "outline"} onClick={() => setMode("wand")}>
+                <Button
+                  size="sm"
+                  variant={mode === "wand" ? "default" : "outline"}
+                  onClick={() => setMode("wand")}
+                >
                   <Sparkles className="h-3.5 w-3.5" /> Wand
                 </Button>
-                <Button size="sm" variant={mode === "brush" ? "default" : "outline"} onClick={() => setMode("brush")}>
+                <Button
+                  size="sm"
+                  variant={mode === "brush" ? "default" : "outline"}
+                  onClick={() => setMode("brush")}
+                >
                   <Brush className="h-3.5 w-3.5" /> Brush
                 </Button>
-                <Button size="sm" variant={mode === "erase" ? "default" : "outline"} onClick={() => setMode("erase")}>
+                <Button
+                  size="sm"
+                  variant={mode === "erase" ? "default" : "outline"}
+                  onClick={() => setMode("erase")}
+                >
                   <Eraser className="h-3.5 w-3.5" /> Erase
                 </Button>
               </div>
@@ -296,10 +379,20 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
                 <div>
                   <div className="mb-1 flex items-center justify-between">
                     <Label className="text-xs">Color tolerance</Label>
-                    <span className="text-[10px] tabular-nums text-muted-foreground">{tolerance}</span>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">
+                      {tolerance}
+                    </span>
                   </div>
-                  <Slider min={0} max={120} step={1} value={[tolerance]} onValueChange={(v) => setTolerance(v[0])} />
-                  <p className="mt-1 text-[10px] text-muted-foreground">Higher = picks more shades</p>
+                  <Slider
+                    min={0}
+                    max={120}
+                    step={1}
+                    value={[tolerance]}
+                    onValueChange={(v) => setTolerance(v[0])}
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Higher = picks more shades
+                  </p>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Contiguous only</Label>
@@ -312,9 +405,17 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
               <div className="space-y-2 rounded-md border border-border p-3">
                 <div className="mb-1 flex items-center justify-between">
                   <Label className="text-xs">Brush size</Label>
-                  <span className="text-[10px] tabular-nums text-muted-foreground">{brushSize}px</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground">
+                    {brushSize}px
+                  </span>
                 </div>
-                <Slider min={4} max={200} step={2} value={[brushSize]} onValueChange={(v) => setBrushSize(v[0])} />
+                <Slider
+                  min={4}
+                  max={200}
+                  step={2}
+                  value={[brushSize]}
+                  onValueChange={(v) => setBrushSize(v[0])}
+                />
               </div>
             )}
 
@@ -324,7 +425,8 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
                 <Switch checked={cutFromSource} onCheckedChange={setCutFromSource} />
               </div>
               <p className="text-[10px] text-muted-foreground">
-                On: original image keeps everything EXCEPT the mask. Off: original stays intact, a copy of the mask becomes a new layer on top.
+                On: original image keeps everything EXCEPT the mask. Off: original stays intact, a
+                copy of the mask becomes a new layer on top.
               </p>
             </div>
 
@@ -340,7 +442,9 @@ export function MaskExtractor({ open, onOpenChange, src, onExtract }: Props) {
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button onClick={doExtract} disabled={!hasMask}>
             <Wand2 className="h-4 w-4" /> Extract to new layer
           </Button>

@@ -50,7 +50,6 @@ export async function upscaleImage(
   targetW = Math.ceil(targetW);
   targetH = Math.ceil(targetH);
 
-
   // Cap at 100 MP per Adobe Stock max.
   const maxPixels = 100_000_000;
   if (targetW * targetH > maxPixels) {
@@ -77,7 +76,6 @@ export async function upscaleImage(
   curCanvas.width = curW;
   curCanvas.height = curH;
   curCanvas.getContext("2d")!.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, curW, curH);
-
 
   while (curW * 2 < targetW) {
     const next = document.createElement("canvas");
@@ -108,7 +106,11 @@ export async function upscaleImage(
 
   // Light unsharp mask so upscaled pixels look crisp at 100% zoom (opt-out via sharpen:false).
   if (opts.sharpen !== false) {
-    try { applyUnsharpMask(out, 0.35); } catch { /* non-fatal */ }
+    try {
+      applyUnsharpMask(out, 0.35);
+    } catch {
+      /* non-fatal */
+    }
   }
 
   const mime = opts.format === "jpeg" ? "image/jpeg" : "image/png";
@@ -124,13 +126,18 @@ export async function upscaleImage(
     // Binary-search JPEG quality to land in [minBytes, maxBytes]
     const min = opts.minBytes ?? 0;
     const max = opts.maxBytes ?? Number.POSITIVE_INFINITY;
-    let lo = 0.6, hi = 1.0, best = await toBlob(baseQuality);
+    let lo = 0.6,
+      hi = 1.0,
+      best = await toBlob(baseQuality);
     for (let i = 0; i < 6; i++) {
       const mid = (lo + hi) / 2;
       const b = await toBlob(mid);
       if (b.size > max) hi = mid;
       else if (b.size < min) lo = mid;
-      else { best = b; break; }
+      else {
+        best = b;
+        break;
+      }
       best = b;
     }
     blob = best;
@@ -150,7 +157,8 @@ function applyUnsharpMask(canvas: HTMLCanvasElement, amount: number) {
   if (w * h > 64_000_000) return;
   const src = ctx.getImageData(0, 0, w, h);
   const dst = ctx.createImageData(w, h);
-  const s = src.data, d = dst.data;
+  const s = src.data,
+    d = dst.data;
   // 3x3 blur weights (approximate gaussian)
   const kw = [1, 2, 1, 2, 4, 2, 1, 2, 1];
   const kwSum = 16;
@@ -158,7 +166,8 @@ function applyUnsharpMask(canvas: HTMLCanvasElement, amount: number) {
     for (let x = 1; x < w - 1; x++) {
       const i = (y * w + x) * 4;
       for (let c = 0; c < 3; c++) {
-        let acc = 0, ki = 0;
+        let acc = 0,
+          ki = 0;
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             acc += s[((y + dy) * w + (x + dx)) * 4 + c] * kw[ki++];
@@ -176,13 +185,19 @@ function applyUnsharpMask(canvas: HTMLCanvasElement, amount: number) {
   for (let x = 0; x < w; x++) {
     for (const y of [0, h - 1]) {
       const i = (y * w + x) * 4;
-      d[i] = s[i]; d[i+1] = s[i+1]; d[i+2] = s[i+2]; d[i+3] = s[i+3];
+      d[i] = s[i];
+      d[i + 1] = s[i + 1];
+      d[i + 2] = s[i + 2];
+      d[i + 3] = s[i + 3];
     }
   }
   for (let y = 0; y < h; y++) {
     for (const x of [0, w - 1]) {
       const i = (y * w + x) * 4;
-      d[i] = s[i]; d[i+1] = s[i+1]; d[i+2] = s[i+2]; d[i+3] = s[i+3];
+      d[i] = s[i];
+      d[i + 1] = s[i + 1];
+      d[i + 2] = s[i + 2];
+      d[i + 3] = s[i + 3];
     }
   }
   ctx.putImageData(dst, 0, 0);

@@ -2,21 +2,21 @@ export type ImageEdits = {
   include: boolean;
   filename: string;
   brightness: number; // 0-200 (100 = none)
-  contrast: number;   // 0-200
-  saturate: number;   // 0-200
+  contrast: number; // 0-200
+  saturate: number; // 0-200
   cropRatio: "original" | "1:1" | "4:5" | "16:9" | "9:16";
-  zoom: number;       // 1 - 3
-  offsetX: number;    // -1 .. 1 (pan as fraction of half-image)
+  zoom: number; // 1 - 3
+  offsetX: number; // -1 .. 1 (pan as fraction of half-image)
   offsetY: number;
-  bgColor: string;        // "" = transparent
-  frameColor: string;     // "" = none
-  frameWidth: number;     // px in output
+  bgColor: string; // "" = transparent
+  frameColor: string; // "" = none
+  frameWidth: number; // px in output
   bannerTop: string;
   bannerBottom: string;
-  bannerColor: string;       // hex
+  bannerColor: string; // hex
   bannerTextColor: string;
-  bannerHeightPct: number;   // 0-25
-  bannerFontPx: number;      // output px (auto-scaled)
+  bannerHeightPct: number; // 0-25
+  bannerFontPx: number; // output px (auto-scaled)
 };
 
 export const DEFAULT_EDITS: ImageEdits = {
@@ -46,9 +46,10 @@ export function loadImg(b64OrUrl: string): Promise<HTMLImageElement> {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = reject;
-    img.src = b64OrUrl.startsWith("data:") || b64OrUrl.startsWith("http")
-      ? b64OrUrl
-      : `data:image/png;base64,${b64OrUrl}`;
+    img.src =
+      b64OrUrl.startsWith("data:") || b64OrUrl.startsWith("http")
+        ? b64OrUrl
+        : `data:image/png;base64,${b64OrUrl}`;
   });
 }
 
@@ -130,19 +131,42 @@ export async function bakeEdits(
   if (edits.bannerTop) {
     ctx.fillStyle = edits.bannerColor;
     ctx.fillRect(0, 0, outW, bannerH);
-    drawBannerText(ctx, edits.bannerTop, outW / 2, bannerH / 2, outW * 0.92, bannerH * 0.7, edits.bannerTextColor, edits.bannerFontPx);
+    drawBannerText(
+      ctx,
+      edits.bannerTop,
+      outW / 2,
+      bannerH / 2,
+      outW * 0.92,
+      bannerH * 0.7,
+      edits.bannerTextColor,
+      edits.bannerFontPx,
+    );
   }
   if (edits.bannerBottom) {
     ctx.fillStyle = edits.bannerColor;
     ctx.fillRect(0, outH - bannerH, outW, bannerH);
-    drawBannerText(ctx, edits.bannerBottom, outW / 2, outH - bannerH / 2, outW * 0.92, bannerH * 0.7, edits.bannerTextColor, edits.bannerFontPx);
+    drawBannerText(
+      ctx,
+      edits.bannerBottom,
+      outW / 2,
+      outH - bannerH / 2,
+      outW * 0.92,
+      bannerH * 0.7,
+      edits.bannerTextColor,
+      edits.bannerFontPx,
+    );
   }
 
   // Frame (drawn last, inside the canvas)
   if (edits.frameColor && edits.frameWidth > 0) {
     ctx.strokeStyle = edits.frameColor;
     ctx.lineWidth = edits.frameWidth;
-    ctx.strokeRect(edits.frameWidth / 2, edits.frameWidth / 2, outW - edits.frameWidth, outH - edits.frameWidth);
+    ctx.strokeRect(
+      edits.frameWidth / 2,
+      edits.frameWidth / 2,
+      outW - edits.frameWidth,
+      outH - edits.frameWidth,
+    );
   }
 
   return new Promise<Blob>((resolve, reject) =>
@@ -191,11 +215,18 @@ export function safeFilename(s: string): string {
 export function drawImageHQ(
   ctx: CanvasRenderingContext2D,
   img: CanvasImageSource,
-  sx: number, sy: number, sw: number, sh: number,
-  dx: number, dy: number, dw: number, dh: number,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
 ) {
   // Cheap path: dimensions roughly equal
-  const ratioW = dw / sw, ratioH = dh / sh;
+  const ratioW = dw / sw,
+    ratioH = dh / sh;
   if (ratioW > 0.5 && ratioW < 2 && ratioH > 0.5 && ratioH < 2) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
@@ -208,7 +239,8 @@ export function drawImageHQ(
   let curH = Math.max(1, Math.round(sh));
   let cur: HTMLCanvasElement | OffscreenCanvas;
   const c0 = document.createElement("canvas");
-  c0.width = curW; c0.height = curH;
+  c0.width = curW;
+  c0.height = curH;
   const cx0 = c0.getContext("2d")!;
   cx0.imageSmoothingEnabled = true;
   cx0.imageSmoothingQuality = "high";
@@ -218,12 +250,15 @@ export function drawImageHQ(
   // Iteratively step toward target
   const stepTo = (nw: number, nh: number) => {
     const next = document.createElement("canvas");
-    next.width = nw; next.height = nh;
+    next.width = nw;
+    next.height = nh;
     const nx = next.getContext("2d")!;
     nx.imageSmoothingEnabled = true;
     nx.imageSmoothingQuality = "high";
     nx.drawImage(cur as CanvasImageSource, 0, 0, curW, curH, 0, 0, nw, nh);
-    cur = next; curW = nw; curH = nh;
+    cur = next;
+    curW = nw;
+    curH = nh;
   };
   // Upscale in 1.5x steps
   while (curW * 1.5 < dw && curH * 1.5 < dh) {
@@ -242,7 +277,10 @@ export function drawImageHQ(
 let __sharpenInjected = false;
 function ensureSharpenFilter() {
   if (__sharpenInjected || typeof document === "undefined") return;
-  if (document.getElementById("__hq_sharpen_svg")) { __sharpenInjected = true; return; }
+  if (document.getElementById("__hq_sharpen_svg")) {
+    __sharpenInjected = true;
+    return;
+  }
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("id", "__hq_sharpen_svg");
@@ -265,7 +303,8 @@ export function applyUnsharp(ctx: CanvasRenderingContext2D, w: number, h: number
   try {
     ensureSharpenFilter();
     const tmp = document.createElement("canvas");
-    tmp.width = w; tmp.height = h;
+    tmp.width = w;
+    tmp.height = h;
     const tctx = tmp.getContext("2d")!;
     tctx.drawImage(ctx.canvas, 0, 0);
     ctx.save();
@@ -278,4 +317,3 @@ export function applyUnsharp(ctx: CanvasRenderingContext2D, w: number, h: number
     // ignore — sharpening is a nice-to-have
   }
 }
-

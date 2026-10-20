@@ -11,8 +11,15 @@ import { checkAdobePolicy, ADOBE_NEGATIVE_CLAUSE } from "@/lib/adobe-stock/polic
 //   POST { action: "start", prompt, duration, model? } -> { operation }
 //   POST { action: "poll",  operation }                -> { done, videoUrl?, error? }
 
-type StartBody = { action: "start"; prompt: string; duration?: number; model?: string; imageBase64?: string; imageMime?: string };
-type PollBody  = { action: "poll"; operation: string };
+type StartBody = {
+  action: "start";
+  prompt: string;
+  duration?: number;
+  model?: string;
+  imageBase64?: string;
+  imageMime?: string;
+};
+type PollBody = { action: "poll"; operation: string };
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -29,7 +36,11 @@ export const Route = createFileRoute("/api/adobe-stock-video")({
         try {
           const body = (await request.json()) as StartBody | PollBody;
           const { key } = pickKey(request);
-          if (!key) return Response.json({ error: "Missing Gemini API key. Add GEMINI_API_KEY or paste it in Settings." }, { status: 401 });
+          if (!key)
+            return Response.json(
+              { error: "Missing Gemini API key. Add GEMINI_API_KEY or paste it in Settings." },
+              { status: 401 },
+            );
 
           if (body.action === "start") {
             const policy = checkAdobePolicy(body.prompt);
@@ -43,7 +54,10 @@ export const Route = createFileRoute("/api/adobe-stock-video")({
             const url = `${GEMINI_BASE}/models/${model}:predictLongRunning?key=${encodeURIComponent(key)}`;
             const instance: Record<string, unknown> = { prompt: fullPrompt };
             if (body.imageBase64) {
-              instance.image = { bytesBase64Encoded: body.imageBase64, mimeType: body.imageMime || "image/jpeg" };
+              instance.image = {
+                bytesBase64Encoded: body.imageBase64,
+                mimeType: body.imageMime || "image/jpeg",
+              };
             }
             const res = await fetch(url, {
               method: "POST",
@@ -60,10 +74,17 @@ export const Route = createFileRoute("/api/adobe-stock-video")({
             });
             if (!res.ok) {
               const txt = await res.text();
-              return Response.json({ error: `Veo start failed: ${txt.slice(0, 400)}` }, { status: res.status });
+              return Response.json(
+                { error: `Veo start failed: ${txt.slice(0, 400)}` },
+                { status: res.status },
+              );
             }
-            const j = await res.json() as { name?: string };
-            if (!j.name) return Response.json({ error: "Veo did not return an operation name" }, { status: 502 });
+            const j = (await res.json()) as { name?: string };
+            if (!j.name)
+              return Response.json(
+                { error: "Veo did not return an operation name" },
+                { status: 502 },
+              );
             return Response.json({ operation: j.name });
           }
 
@@ -72,12 +93,17 @@ export const Route = createFileRoute("/api/adobe-stock-video")({
             const res = await fetch(url);
             if (!res.ok) {
               const txt = await res.text();
-              return Response.json({ error: `Veo poll failed: ${txt.slice(0, 400)}` }, { status: res.status });
+              return Response.json(
+                { error: `Veo poll failed: ${txt.slice(0, 400)}` },
+                { status: res.status },
+              );
             }
-            const j = await res.json() as {
+            const j = (await res.json()) as {
               done?: boolean;
               error?: { message?: string };
-              response?: { generateVideoResponse?: { generatedSamples?: { video?: { uri?: string } }[] } };
+              response?: {
+                generateVideoResponse?: { generatedSamples?: { video?: { uri?: string } }[] };
+              };
             };
             if (j.error?.message) return Response.json({ done: true, error: j.error.message });
             if (!j.done) return Response.json({ done: false });
@@ -87,13 +113,22 @@ export const Route = createFileRoute("/api/adobe-stock-video")({
 
             // The URI is a Files API URL — fetch with key, return as base64 (Adobe Stock max 3.9 GB,
             // but Veo clips are tens of MB so this is fine).
-            const vidRes = await fetch(`${uri}${uri.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`);
+            const vidRes = await fetch(
+              `${uri}${uri.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`,
+            );
             if (!vidRes.ok) {
-              return Response.json({ done: true, error: `Failed to download Veo video: ${vidRes.status}` });
+              return Response.json({
+                done: true,
+                error: `Failed to download Veo video: ${vidRes.status}`,
+              });
             }
             const buf = await vidRes.arrayBuffer();
             const b64 = Buffer.from(buf).toString("base64");
-            return Response.json({ done: true, videoBase64: b64, mime: vidRes.headers.get("content-type") || "video/mp4" });
+            return Response.json({
+              done: true,
+              videoBase64: b64,
+              mime: vidRes.headers.get("content-type") || "video/mp4",
+            });
           }
 
           return Response.json({ error: "Unknown action" }, { status: 400 });

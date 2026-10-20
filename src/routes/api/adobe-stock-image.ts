@@ -6,7 +6,9 @@ import { originalitySeed, SHARPNESS_CLAUSE } from "@/lib/adobe-stock/originality
 /** Simple heuristic: is the requested subject better rendered as a vector (SVG)? */
 function looksVectorish(prompt: string): boolean {
   const p = prompt.toLowerCase();
-  return /\b(logo|icon|flat\s+illustration|vector|infographic|pictogram|badge|emblem|monogram|line[- ]art|geometric|pattern|clipart|clip[- ]art)\b/.test(p);
+  return /\b(logo|icon|flat\s+illustration|vector|infographic|pictogram|badge|emblem|monogram|line[- ]art|geometric|pattern|clipart|clip[- ]art)\b/.test(
+    p,
+  );
 }
 
 export const Route = createFileRoute("/api/adobe-stock-image")({
@@ -42,12 +44,24 @@ export const Route = createFileRoute("/api/adobe-stock-image")({
             originalitySeed(),
             ADOBE_NEGATIVE_CLAUSE,
             "Deliver a truly original composition — not derivative of existing stock imagery. Maximum native resolution and detail density.",
-          ].filter(Boolean).join("\n");
+          ]
+            .filter(Boolean)
+            .join("\n");
 
           const { provider, key } = resolveProvider(request);
-          if (!key) return Response.json({ error: `Missing API key for ${provider}. Add it in Settings.` }, { status: 401 });
+          if (!key)
+            return Response.json(
+              { error: `Missing API key for ${provider}. Add it in Settings.` },
+              { status: 401 },
+            );
 
-          const b64 = await callImage({ provider, key, prompt: fullPrompt, aspectRatio: aspect, hires: hires ?? true });
+          const b64 = await callImage({
+            provider,
+            key,
+            prompt: fullPrompt,
+            aspectRatio: aspect,
+            hires: hires ?? true,
+          });
           return Response.json({ image: b64, provider, vectorSuggested: looksVectorish(prompt) });
         } catch (e) {
           const status = statusFromError(e);

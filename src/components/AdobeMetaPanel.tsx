@@ -24,7 +24,13 @@ type Props = {
   autoTriggerKey?: string | number | null;
 };
 
-export function AdobeMetaPanel({ prompt, assetType, headers, onFilenameChange, autoTriggerKey }: Props) {
+export function AdobeMetaPanel({
+  prompt,
+  assetType,
+  headers,
+  onFilenameChange,
+  autoTriggerKey,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<AdobeMeta | null>(null);
@@ -75,7 +81,11 @@ export function AdobeMetaPanel({ prompt, assetType, headers, onFilenameChange, a
 
   const updateFilename = (v: string) => {
     if (!meta) return;
-    const clean = v.toLowerCase().replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const clean = v
+      .toLowerCase()
+      .replace(/\.[a-z0-9]{2,4}$/i, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
     setMeta({ ...meta, filename: clean });
     onFilenameChange?.(clean);
   };
@@ -86,10 +96,21 @@ export function AdobeMetaPanel({ prompt, assetType, headers, onFilenameChange, a
         <div className="flex items-center gap-2">
           <Tag className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Adobe Stock SEO metadata</span>
-          <Badge variant="secondary" className="text-[10px]">high-demand keywords</Badge>
+          <Badge variant="secondary" className="text-[10px]">
+            high-demand keywords
+          </Badge>
         </div>
-        <Button size="sm" variant={meta ? "outline" : "default"} onClick={generate} disabled={loading || !prompt.trim()}>
-          {loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+        <Button
+          size="sm"
+          variant={meta ? "outline" : "default"}
+          onClick={generate}
+          disabled={loading || !prompt.trim()}
+        >
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+          )}
           {meta ? "Regenerate" : "Generate metadata"}
         </Button>
       </div>
@@ -98,39 +119,80 @@ export function AdobeMetaPanel({ prompt, assetType, headers, onFilenameChange, a
 
       {meta && (
         <div className="space-y-3 text-sm">
-          <Field label="Title" value={meta.title} onCopy={() => copy("title", meta.title)} copied={copied === "title"}>
+          <Field
+            label="Title"
+            value={meta.title}
+            onCopy={() => copy("title", meta.title)}
+            copied={copied === "title"}
+          >
             <p className="text-xs text-muted-foreground">{meta.title.length}/70 characters</p>
           </Field>
 
-          <Field label="Filename" value={`${meta.filename}.${extFor(assetType)}`} onCopy={() => copy("filename", meta.filename)} copied={copied === "filename"}>
-            <Input value={meta.filename} onChange={(e) => updateFilename(e.target.value)} className="h-8 text-sm" />
+          <Field
+            label="Filename"
+            value={`${meta.filename}.${extFor(assetType)}`}
+            onCopy={() => copy("filename", meta.filename)}
+            copied={copied === "filename"}
+          >
+            <Input
+              value={meta.filename}
+              onChange={(e) => updateFilename(e.target.value)}
+              className="h-8 text-sm"
+            />
             <p className="text-xs text-muted-foreground">Used for the download filename.</p>
           </Field>
 
-          <Field label="Description" value={meta.description} onCopy={() => copy("desc", meta.description)} copied={copied === "desc"}>
+          <Field
+            label="Description"
+            value={meta.description}
+            onCopy={() => copy("desc", meta.description)}
+            copied={copied === "desc"}
+          >
             <Textarea value={meta.description} readOnly className="text-sm min-h-[60px]" />
           </Field>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <Label className="text-xs font-medium">Keywords ({meta.keywords.length}/50) — ordered by priority</Label>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => copy("kw", meta.keywords.join(", "))}>
-                {copied === "kw" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+              <Label className="text-xs font-medium">
+                Keywords ({meta.keywords.length}/50) — ordered by priority
+              </Label>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => copy("kw", meta.keywords.join(", "))}
+              >
+                {copied === "kw" ? (
+                  <Check className="h-3 w-3 mr-1" />
+                ) : (
+                  <Copy className="h-3 w-3 mr-1" />
+                )}
                 Copy all
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5 max-h-40 overflow-auto rounded bg-background p-2 border">
               {meta.keywords.map((k, i) => (
-                <Badge key={i} variant={i < 10 ? "default" : "secondary"} className="text-[11px] font-normal">
+                <Badge
+                  key={i}
+                  variant={i < 10 ? "default" : "secondary"}
+                  className="text-[11px] font-normal"
+                >
                   {i < 10 && <span className="opacity-60 mr-1">{i + 1}.</span>}
                   {k}
                 </Badge>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">First 10 keywords (highlighted) drive most of Adobe's relevance ranking.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              First 10 keywords (highlighted) drive most of Adobe's relevance ranking.
+            </p>
           </div>
 
-          <Field label="Category" value={meta.category} onCopy={() => copy("cat", meta.category)} copied={copied === "cat"} />
+          <Field
+            label="Category"
+            value={meta.category}
+            onCopy={() => copy("cat", meta.category)}
+            copied={copied === "cat"}
+          />
         </div>
       )}
     </div>
@@ -138,8 +200,18 @@ export function AdobeMetaPanel({ prompt, assetType, headers, onFilenameChange, a
 }
 
 function Field({
-  label, value, onCopy, copied, children,
-}: { label: string; value: string; onCopy: () => void; copied: boolean; children?: React.ReactNode }) {
+  label,
+  value,
+  onCopy,
+  copied,
+  children,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  copied: boolean;
+  children?: React.ReactNode;
+}) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1">

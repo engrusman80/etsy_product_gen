@@ -3,18 +3,28 @@
 // Adobe Stock "too similar to existing content" rejections.
 
 const CAMERA_ANGLES = [
-  "unusual low-angle worm's-eye view", "steep top-down flat-lay 90° overhead",
-  "dutch-tilted 15° diagonal framing", "extreme close-up macro perspective",
-  "wide 24mm environmental context shot", "isometric 30° three-quarter view",
-  "over-the-shoulder implied perspective", "profile side-elevation composition",
-  "asymmetric off-center rule-of-thirds framing", "symmetrical dead-center hero framing",
+  "unusual low-angle worm's-eye view",
+  "steep top-down flat-lay 90° overhead",
+  "dutch-tilted 15° diagonal framing",
+  "extreme close-up macro perspective",
+  "wide 24mm environmental context shot",
+  "isometric 30° three-quarter view",
+  "over-the-shoulder implied perspective",
+  "profile side-elevation composition",
+  "asymmetric off-center rule-of-thirds framing",
+  "symmetrical dead-center hero framing",
 ];
 const LIGHTING = [
-  "golden-hour warm side-light with long shadows", "cool overcast diffused north-light",
-  "moody chiaroscuro single-source rim-light", "high-key soft studio softbox lighting",
-  "neon dual-tone cyan+magenta gel lighting", "candle-lit warm 1800K amber glow",
-  "backlit silhouette with sun flare", "clean shadowless bounced studio light",
-  "dramatic split-light 50/50 shadow", "hazy volumetric god-rays through window",
+  "golden-hour warm side-light with long shadows",
+  "cool overcast diffused north-light",
+  "moody chiaroscuro single-source rim-light",
+  "high-key soft studio softbox lighting",
+  "neon dual-tone cyan+magenta gel lighting",
+  "candle-lit warm 1800K amber glow",
+  "backlit silhouette with sun flare",
+  "clean shadowless bounced studio light",
+  "dramatic split-light 50/50 shadow",
+  "hazy volumetric god-rays through window",
 ];
 const PALETTES = [
   "muted earth-tone palette (terracotta, sage, cream, rust)",
@@ -42,7 +52,9 @@ const STYLE_TWISTS = [
   "with a genuine imperfect real-world touch (bokeh, dust, or slight wear)",
 ];
 
-function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
 /** Returns 2–3 short sentences to append to the prompt so each run is unique. */
 export function originalitySeed(): string {

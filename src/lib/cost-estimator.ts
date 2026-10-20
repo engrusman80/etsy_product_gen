@@ -25,10 +25,14 @@ type ProviderCost = {
 // derived from the underlying model published pricing.
 const LOVABLE: ProviderCost = {
   label: "Default AI",
-  usd:     { text: 0.0002, image: 0.039, mockup: 0.039, removebg: 0 },
-  credits: { text: 0.02,   image: 3.9,   mockup: 3.9,   removebg: 0 },
+  usd: { text: 0.0002, image: 0.039, mockup: 0.039, removebg: 0 },
+  credits: { text: 0.02, image: 3.9, mockup: 3.9, removebg: 0 },
   freeNote: "Uses your workspace credits ($25 free Cloud + $1 free AI / month).",
-  models: { text: "google/gemini-2.5-flash", image: "google/gemini-2.5-flash-image", mockup: "google/gemini-2.5-flash-image" },
+  models: {
+    text: "google/gemini-2.5-flash",
+    image: "google/gemini-2.5-flash-image",
+    mockup: "google/gemini-2.5-flash-image",
+  },
 };
 
 const OPENAI: ProviderCost = {
@@ -36,15 +40,24 @@ const OPENAI: ProviderCost = {
   usd: { text: 0.0005, image: 0.19, mockup: 0.19, removebg: 0 },
   freeNote: "Pay-per-use — no free quota. gpt-image-1 high quality is the priciest line item.",
   billingUrl: "https://platform.openai.com/account/billing",
-  models: { text: "gpt-4o-mini", image: "gpt-image-1 (high, 1024²)", mockup: "gpt-image-1 (edits, 1024²)" },
+  models: {
+    text: "gpt-4o-mini",
+    image: "gpt-image-1 (high, 1024²)",
+    mockup: "gpt-image-1 (edits, 1024²)",
+  },
 };
 
 const GEMINI: ProviderCost = {
   label: "Google Gemini",
   usd: { text: 0.0001, image: 0.039, mockup: 0.039, removebg: 0 },
-  freeNote: "Free tier: 1,500 text + ~100 image requests/day on AI Studio keys. Estimates assume paid tier.",
+  freeNote:
+    "Free tier: 1,500 text + ~100 image requests/day on AI Studio keys. Estimates assume paid tier.",
   billingUrl: "https://aistudio.google.com/apikey",
-  models: { text: "gemini-2.5-flash", image: "gemini-2.5-flash-image-preview", mockup: "gemini-2.5-flash-image-preview" },
+  models: {
+    text: "gemini-2.5-flash",
+    image: "gemini-2.5-flash-image-preview",
+    mockup: "gemini-2.5-flash-image-preview",
+  },
 };
 
 const OPENROUTER: ProviderCost = {
@@ -52,11 +65,15 @@ const OPENROUTER: ProviderCost = {
   usd: { text: 0.0002, image: 0.04, mockup: 0.04, removebg: 0 },
   freeNote: "Pay-per-use, ~5% markup over upstream provider.",
   billingUrl: "https://openrouter.ai/credits",
-  models: { text: "google/gemini-2.5-flash", image: "google/gemini-2.5-flash-image-preview", mockup: "google/gemini-2.5-flash-image-preview" },
+  models: {
+    text: "google/gemini-2.5-flash",
+    image: "google/gemini-2.5-flash-image-preview",
+    mockup: "google/gemini-2.5-flash-image-preview",
+  },
 };
 
 // remove.bg is an independent paid service (not an AI provider).
-const REMOVEBG_USD_PER_IMAGE = 0.20;
+const REMOVEBG_USD_PER_IMAGE = 0.2;
 
 export const PROVIDERS: Record<Provider, ProviderCost> = {
   lovable: LOVABLE,
@@ -102,14 +119,20 @@ export function estimateRun(input: EstimateInput): Estimate {
   const { provider, products, variations, mockupsPerVariation, useRemoveBgApi } = input;
   const p = PROVIDERS[provider];
 
-  const seoCalls = products;                                 // 1 SEO per product (shared across variations)
-  const imageCalls = products * variations;                  // 1 design per variation
+  const seoCalls = products; // 1 SEO per product (shared across variations)
+  const imageCalls = products * variations; // 1 design per variation
   const mockupCalls = products * variations * mockupsPerVariation;
   const bgCalls = useRemoveBgApi ? imageCalls : 0;
 
   const items: LineItem[] = [];
 
-  const addLine = (label: string, count: number, op: OpKind, modelOverride?: string, perCallUsdOverride?: number) => {
+  const addLine = (
+    label: string,
+    count: number,
+    op: OpKind,
+    modelOverride?: string,
+    perCallUsdOverride?: number,
+  ) => {
     if (count <= 0) return;
     const perCallUsd = perCallUsdOverride ?? p.usd[op];
     const perCallCredits = p.credits?.[op];
@@ -138,9 +161,7 @@ export function estimateRun(input: EstimateInput): Estimate {
   }
 
   const totalUsd = items.reduce((a, i) => a + i.totalUsd, 0);
-  const totalCredits = p.credits
-    ? items.reduce((a, i) => a + (i.totalCredits ?? 0), 0)
-    : undefined;
+  const totalCredits = p.credits ? items.reduce((a, i) => a + (i.totalCredits ?? 0), 0) : undefined;
   const totalCalls = items.reduce((a, i) => a + i.count, 0);
 
   return {

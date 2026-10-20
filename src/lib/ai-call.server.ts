@@ -58,20 +58,28 @@ export async function callText(opts: TextOpts): Promise<string> {
         };
         if (system) body.systemInstruction = { parts: [{ text: system }] };
         const res = await fetch(url, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         });
         if (!res.ok) throw await httpErr(res, "Gemini text");
-        const j = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+        const j = (await res.json()) as {
+          candidates?: { content?: { parts?: { text?: string }[] } }[];
+        };
         const text = j.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ?? "";
         if (!text) throw new Error("Gemini returned empty response");
         return text;
       }
 
       const cfg = openAiCompatConfig(provider);
-      const model = provider === "openai" ? "gpt-4o-mini"
-                  : provider === "openrouter" ? "google/gemini-2.5-flash"
-                  : provider === "xai" ? "grok-2-1212"
-                  : "google/gemini-2.5-flash";
+      const model =
+        provider === "openai"
+          ? "gpt-4o-mini"
+          : provider === "openrouter"
+            ? "google/gemini-2.5-flash"
+            : provider === "xai"
+              ? "grok-2-1212"
+              : "google/gemini-2.5-flash";
       const messages: { role: string; content: string }[] = [];
       if (system) messages.push({ role: "system", content: system });
       messages.push({ role: "user", content: user });
@@ -79,18 +87,28 @@ export async function callText(opts: TextOpts): Promise<string> {
       if (json) body.response_format = { type: "json_object" };
       const res = await fetch(`${cfg.baseURL}/chat/completions`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...cfg.extraHeaders },
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          ...cfg.extraHeaders,
+        },
         body: JSON.stringify(body),
       });
       if (!res.ok) throw await httpErr(res, `${provider} text`);
-      const j = await res.json() as { choices?: { message?: { content?: string } }[] };
+      const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const content = j.choices?.[0]?.message?.content ?? "";
       if (!content) throw new Error(`${provider} returned empty content`);
       return content;
     } catch (e) {
       lastErr = e as Error;
       const status = (e as Error & { status?: number }).status;
-      const retriable = status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || status === 524;
+      const retriable =
+        status === 429 ||
+        status === 500 ||
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        status === 524;
       if (!retriable || attempt >= delays.length) throw e;
       await new Promise((r) => setTimeout(r, delays[attempt]));
     }
@@ -131,7 +149,7 @@ export async function callImage(opts: ImageOpts): Promise<string> {
         body: form,
       });
       if (!res.ok) throw await httpErr(res, "OpenAI image edit");
-      const j = await res.json() as { data?: { b64_json?: string }[] };
+      const j = (await res.json()) as { data?: { b64_json?: string }[] };
       const b64 = j.data?.[0]?.b64_json;
       if (!b64) throw new Error("OpenAI returned no image");
       return b64;
@@ -144,7 +162,7 @@ export async function callImage(opts: ImageOpts): Promise<string> {
       body: JSON.stringify({ model: "gpt-image-1", prompt, size: oaSize, quality: "high", n: 1 }),
     });
     if (!res.ok) throw await httpErr(res, "OpenAI image");
-    const j = await res.json() as { data?: { b64_json?: string }[] };
+    const j = (await res.json()) as { data?: { b64_json?: string }[] };
     const b64 = j.data?.[0]?.b64_json;
     if (!b64) throw new Error("OpenAI returned no image");
     return b64;
@@ -155,16 +173,22 @@ export async function callImage(opts: ImageOpts): Promise<string> {
     const res = await fetch("https://api.x.ai/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "grok-2-image-1212", prompt, response_format: "b64_json", n: 1 }),
+      body: JSON.stringify({
+        model: "grok-2-image-1212",
+        prompt,
+        response_format: "b64_json",
+        n: 1,
+      }),
     });
     if (!res.ok) throw await httpErr(res, "xAI Grok image");
-    const j = await res.json() as { data?: { b64_json?: string; url?: string }[] };
+    const j = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
     const item = j.data?.[0];
     if (item?.b64_json) return item.b64_json;
     if (item?.url) {
       const img = await fetch(item.url);
       const buf = new Uint8Array(await img.arrayBuffer());
-      let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      let bin = "";
+      for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
       return btoa(bin);
     }
     throw new Error("xAI Grok returned no image");
@@ -185,18 +209,37 @@ export async function callImage(opts: ImageOpts): Promise<string> {
         const fallbackKey = process.env.LOVABLE_API_KEY || process.env.OPENROUTER_API_KEY;
         const fallbackProvider: Provider = process.env.LOVABLE_API_KEY ? "lovable" : "openrouter";
         if (fallbackKey) {
-          return await callImage({ provider: fallbackProvider, key: fallbackKey, prompt, inputImageB64, aspectRatio, hires });
+          return await callImage({
+            provider: fallbackProvider,
+            key: fallbackKey,
+            prompt,
+            inputImageB64,
+            aspectRatio,
+            hires,
+          });
         }
-        throw new Error("Gemini image API is not available in your region. Add a Default gateway key (LOVABLE_API_KEY) or OpenRouter key in Settings to use the proxied route.");
+        throw new Error(
+          "Gemini image API is not available in your region. Add a Default gateway key (LOVABLE_API_KEY) or OpenRouter key in Settings to use the proxied route.",
+        );
       }
-      if (hires) return geminiImageWithRetry("gemini-2.5-flash-image", key, prompt, inputImageB64, aspectRatio);
+      if (hires)
+        return geminiImageWithRetry(
+          "gemini-2.5-flash-image",
+          key,
+          prompt,
+          inputImageB64,
+          aspectRatio,
+        );
       throw e;
     }
   }
 
   // Default + OpenRouter: OpenAI-compatible chat completions with Gemini image model
   const cfg = openAiCompatConfig(provider);
-  const model = provider === "openrouter" ? "google/gemini-2.5-flash-image-preview" : "google/gemini-2.5-flash-image";
+  const model =
+    provider === "openrouter"
+      ? "google/gemini-2.5-flash-image-preview"
+      : "google/gemini-2.5-flash-image";
   const userContent: unknown = inputImageB64
     ? [
         { type: "text", text: prompt },
@@ -206,7 +249,11 @@ export async function callImage(opts: ImageOpts): Promise<string> {
 
   const res = await fetch(`${cfg.baseURL}/chat/completions`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...cfg.extraHeaders },
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...cfg.extraHeaders,
+    },
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: userContent }],
@@ -214,7 +261,7 @@ export async function callImage(opts: ImageOpts): Promise<string> {
     }),
   });
   if (!res.ok) throw await httpErr(res, `${provider} image`);
-  const j = await res.json() as {
+  const j = (await res.json()) as {
     choices?: { message?: { images?: { image_url?: { url?: string } }[]; content?: unknown } }[];
   };
   const url = j.choices?.[0]?.message?.images?.[0]?.image_url?.url;
@@ -222,7 +269,10 @@ export async function callImage(opts: ImageOpts): Promise<string> {
   return url.startsWith("data:") ? url.split(",")[1] : url;
 }
 
-function openAiCompatConfig(provider: Provider): { baseURL: string; extraHeaders: Record<string, string> } {
+function openAiCompatConfig(provider: Provider): {
+  baseURL: string;
+  extraHeaders: Record<string, string>;
+} {
   if (provider === "openrouter") {
     return {
       baseURL: "https://openrouter.ai/api/v1",
@@ -257,11 +307,21 @@ async function httpErr(res: Response, label: string): Promise<Error> {
   return e;
 }
 
-async function callImageFallbackGemini(key: string, prompt: string, inputImageB64?: string): Promise<string> {
+async function callImageFallbackGemini(
+  key: string,
+  prompt: string,
+  inputImageB64?: string,
+): Promise<string> {
   return geminiImageWithRetry("gemini-2.5-flash-image", key, prompt, inputImageB64, undefined);
 }
 
-async function geminiImageWithRetry(model: string, key: string, prompt: string, inputImageB64?: string, aspectRatio?: string): Promise<string> {
+async function geminiImageWithRetry(
+  model: string,
+  key: string,
+  prompt: string,
+  inputImageB64?: string,
+  aspectRatio?: string,
+): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const parts: Array<Record<string, unknown>> = [{ text: prompt }];
   if (inputImageB64) parts.push({ inlineData: { mimeType: "image/png", data: inputImageB64 } });
@@ -272,10 +332,18 @@ async function geminiImageWithRetry(model: string, key: string, prompt: string, 
   let lastErr: Error | null = null;
   const delays = [1500, 4000, 9000, 15000]; // total ~30s of waiting
   for (let attempt = 0; attempt <= delays.length; attempt++) {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
     if (res.ok) {
-      const j = await res.json() as {
-        candidates?: { content?: { parts?: { inlineData?: { data?: string }; inline_data?: { data?: string } }[] } }[];
+      const j = (await res.json()) as {
+        candidates?: {
+          content?: {
+            parts?: { inlineData?: { data?: string }; inline_data?: { data?: string } }[];
+          };
+        }[];
       };
       for (const p of j.candidates?.[0]?.content?.parts ?? []) {
         const data = p.inlineData?.data ?? p.inline_data?.data;

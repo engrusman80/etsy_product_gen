@@ -4,9 +4,9 @@
 
 export type TrendingPrompt = {
   id: string;
-  label: string;      // Short human title shown as a chip
-  category: string;   // Loose grouping for UI filtering
-  prompt: string;     // The full prompt fed to the image model
+  label: string; // Short human title shown as a chip
+  category: string; // Loose grouping for UI filtering
+  prompt: string; // The full prompt fed to the image model
   bestFor: ("jpeg" | "png" | "svg" | "wallpaper")[];
   bestAspect?: "1:1" | "3:2" | "16:9" | "2:3" | "9:16" | "4:5" | "9:19.5";
 };

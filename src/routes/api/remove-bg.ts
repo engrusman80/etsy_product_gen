@@ -10,7 +10,11 @@ export const Route = createFileRoute("/api/remove-bg")({
 
           const overrideKey = request.headers.get("x-removebg-key")?.trim();
           const apiKey = overrideKey || process.env.REMOVE_BG_API_KEY;
-          if (!apiKey) return Response.json({ error: "Missing REMOVE_BG_API_KEY. Add it in Settings." }, { status: 500 });
+          if (!apiKey)
+            return Response.json(
+              { error: "Missing REMOVE_BG_API_KEY. Add it in Settings." },
+              { status: 500 },
+            );
 
           const res = await fetch("https://api.remove.bg/v1.0/removebg", {
             method: "POST",
@@ -20,7 +24,10 @@ export const Route = createFileRoute("/api/remove-bg")({
 
           if (!res.ok) {
             const text = await res.text();
-            return Response.json({ error: `remove.bg error: ${text.slice(0, 200)}` }, { status: 500 });
+            return Response.json(
+              { error: `remove.bg error: ${text.slice(0, 200)}` },
+              { status: 500 },
+            );
           }
           const buf = await res.arrayBuffer();
           const b64 = Buffer.from(buf).toString("base64");

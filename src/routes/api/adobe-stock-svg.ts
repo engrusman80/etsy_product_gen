@@ -8,7 +8,10 @@ export const Route = createFileRoute("/api/adobe-stock-svg")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { prompt, artboard } = (await request.json()) as { prompt: string; artboard?: number };
+          const { prompt, artboard } = (await request.json()) as {
+            prompt: string;
+            artboard?: number;
+          };
           if (!prompt) return Response.json({ error: "Missing prompt" }, { status: 400 });
 
           const policy = checkAdobePolicy(prompt);
@@ -18,7 +21,11 @@ export const Route = createFileRoute("/api/adobe-stock-svg")({
           const size = Math.min(8000, Math.max(3873, artboard ?? 4000));
 
           const { provider, key } = resolveProvider(request);
-          if (!key) return Response.json({ error: `Missing API key for ${provider}. Add it in Settings.` }, { status: 401 });
+          if (!key)
+            return Response.json(
+              { error: `Missing API key for ${provider}. Add it in Settings.` },
+              { status: 401 },
+            );
 
           const sys = `You are a senior vector illustrator producing Adobe Stock-grade SVG artwork.
 Output ONLY a single valid <svg>...</svg> document — no markdown fences, no commentary, no <!DOCTYPE>.
@@ -43,7 +50,11 @@ Adobe Stock compliance: ${ADOBE_NEGATIVE_CLAUSE}`;
             .trim();
 
           const match = cleaned.match(/<svg[\s\S]*<\/svg>/i);
-          if (!match) return Response.json({ error: "Model did not return a valid <svg> document." }, { status: 502 });
+          if (!match)
+            return Response.json(
+              { error: "Model did not return a valid <svg> document." },
+              { status: 502 },
+            );
 
           return Response.json({ svg: match[0], size });
         } catch (e) {

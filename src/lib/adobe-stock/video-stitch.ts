@@ -73,9 +73,22 @@ export async function concatMp4(blobs: Blob[], onProgress?: (msg: string) => voi
   } catch {
     onProgress?.("Re-encoding for smooth join...");
     await ff.exec([
-      "-f", "concat", "-safe", "0", "-i", "list.txt",
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-      "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      "list.txt",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "18",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
       "out.mp4",
     ]);
   }
