@@ -160,13 +160,21 @@ export type DailyItem = {
   listingId?: number;
   editUrl?: string;
   error?: string;
+  /** Day of the last failed try, so a failing idea is retried once a day, not on every open. */
+  triedAt?: string;
+  /** Etsy numbers when the app picked this idea by demand. */
+  competition?: number;
+  favorites?: number;
 };
 
 const QUEUE_KEY = "etsyforge:daily-queue";
-const LAST_KEY = "etsyforge:daily-last";
 const CHECK_KEY = "etsyforge:shop-check";
 
-const today = () => new Date().toISOString().slice(0, 10);
+/** Local calendar day, so "today" turns over at the user's midnight. */
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export function loadQueue(): DailyItem[] {
   try {
@@ -184,15 +192,30 @@ export function saveQueue(q: DailyItem[]) {
   }
 }
 
-/** The next queued idea when today's draft has not been made yet. */
-export function dueDailyItem(): DailyItem | null {
-  if (localStorage.getItem(LAST_KEY) === today()) return null;
-  return loadQueue().find((i) => !i.doneAt) ?? null;
+/** Drafts already made today. */
+export const draftsToday = () => loadQueue().filter((i) => i.doneAt === today()).length;
+
+/** Queued ideas still to make today, up to the per-day limit; failed ones wait until tomorrow. */
+export function dueDailyItems(perDay: number): DailyItem[] {
+  const left = Math.max(0, perDay - draftsToday());
+  return loadQueue()
+    .filter((i) => !i.doneAt && i.triedAt !== today())
+    .slice(0, left);
 }
 
 export function markDaily(id: string, patch: Partial<DailyItem>) {
-  saveQueue(loadQueue().map((i) => (i.id === id ? { ...i, ...patch } : i)));
-  if (patch.doneAt) localStorage.setItem(LAST_KEY, today());
+  const extra = patch.error && !patch.doneAt ? { triedAt: today() } : {};
+  saveQueue(loadQueue().map((i) => (i.id === id ? { ...i, ...patch, ...extra } : i)));
+}
+
+export function addToQueue(items: Omit<DailyItem, "id">[]) {
+  const q = loadQueue();
+  const have = new Set(q.map((i) => i.idea.toLowerCase()));
+  const fresh = items
+    .filter((i) => !have.has(i.idea.toLowerCase()))
+    .map((i) => ({ ...i, id: crypto.randomUUID() }));
+  saveQueue([...q, ...fresh]);
+  return fresh;
 }
 
 export type StoredCheck = { at: string; total: number; flagged: number };

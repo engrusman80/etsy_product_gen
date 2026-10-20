@@ -7,7 +7,9 @@ import {
   getActiveListings,
   getMyShop,
   refreshTokens,
+  searchMarket,
   updateListing,
+  updatePrice,
   type DraftInput,
 } from "@/lib/etsy/api.server";
 
@@ -22,7 +24,9 @@ type Body =
       listingId: number;
       fields: { title?: string; description?: string; tags?: string[] };
     }
-  | { action: "draft"; shopId: number; draft: DraftInput };
+  | { action: "draft"; shopId: number; draft: DraftInput }
+  | { action: "market"; keywords: string[] }
+  | { action: "price"; listingId: number; price: number };
 
 /** One endpoint for the Etsy page, Settings and the draft buttons. Drafts are never published. */
 export const Route = createFileRoute("/api/etsy")({
@@ -48,6 +52,22 @@ export const Route = createFileRoute("/api/etsy")({
               return Response.json({ ok: true });
             case "draft":
               return Response.json(await createDraft(creds, body.shopId, body.draft));
+            case "market": {
+              // A few searches at a time keeps well inside Etsy's rate limit.
+              const markets = [];
+              for (const k of body.keywords.slice(0, 12)) {
+                try {
+                  markets.push(await searchMarket(creds, k));
+                } catch (e) {
+                  markets.push({ keywords: k, error: (e as Error).message });
+                }
+              }
+              return Response.json({ markets });
+            }
+            case "price":
+              if (!(body.price >= 0.2)) throw new EtsyError("Etsy's lowest price is $0.20.", 400);
+              await updatePrice(creds, body.listingId, body.price);
+              return Response.json({ ok: true });
             default:
               return Response.json({ error: "Unknown action" }, { status: 400 });
           }

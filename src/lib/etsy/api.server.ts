@@ -27,7 +27,7 @@ export function credsFrom(request: Request): EtsyCreds {
 async function etsy<T>(
   creds: EtsyCreds,
   path: string,
-  init: { method?: string; form?: Record<string, string>; body?: FormData } = {},
+  init: { method?: string; form?: Record<string, string>; json?: unknown; body?: FormData } = {},
 ): Promise<T> {
   if (!creds.keystring || !creds.secret)
     throw new EtsyError("Add your Etsy keystring and shared secret in Settings.", 400);
@@ -40,6 +40,10 @@ async function etsy<T>(
   if (init.form) {
     headers["Content-Type"] = "application/x-www-form-urlencoded";
     body = new URLSearchParams(init.form).toString();
+  }
+  if (init.json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(init.json);
   }
   const res = await fetch(`${API}${path}`, { method: init.method ?? "GET", headers, body });
   const text = await res.text();
@@ -131,6 +135,95 @@ export function updateListing(
   return etsy<EtsyListing>(creds, `/application/shops/${shopId}/listings/${listingId}`, {
     method: "PATCH",
     form,
+  });
+}
+
+type Money = { amount: number; divisor: number; currency_code: string };
+const usd = (m?: Money) => (m ? m.amount / m.divisor : 0);
+
+export type Market = {
+  keywords: string;
+  /** Active Etsy listings matching the keywords: the competition. */
+  count: number;
+  /** Prices of the top matches in the main currency, sorted low to high. */
+  prices: number[];
+  currency: string;
+  /** Average favorites of the top matches: a rough sign of buyer demand. */
+  avgFavorites: number;
+  topTitles: string[];
+};
+
+/** Looks at the top active listings for a search, using only the app key (public data). */
+export async function searchMarket(creds: EtsyCreds, keywords: string): Promise<Market> {
+  const q = new URLSearchParams({ keywords, limit: "50", sort_on: "score" });
+  const page = await etsy<{
+    count: number;
+    results: { title: string; price?: Money; num_favorers?: number }[];
+  }>({ ...creds, token: undefined }, `/application/listings/active?${q}`);
+  const currencies = new Map<string, number>();
+  for (const r of page.results)
+    if (r.price)
+      currencies.set(r.price.currency_code, (currencies.get(r.price.currency_code) ?? 0) + 1);
+  const currency = [...currencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
+  const prices = page.results
+    .filter((r) => r.price?.currency_code === currency)
+    .map((r) => usd(r.price))
+    .filter((p) => p > 0)
+    .sort((a, b) => a - b);
+  const favs = page.results.map((r) => r.num_favorers ?? 0);
+  return {
+    keywords,
+    count: page.count,
+    prices,
+    currency,
+    avgFavorites: favs.length ? Math.round(favs.reduce((a, b) => a + b, 0) / favs.length) : 0,
+    topTitles: page.results.slice(0, 10).map((r) => r.title),
+  };
+}
+
+type InventoryProduct = {
+  sku?: string;
+  property_values: {
+    property_id: number;
+    property_name?: string;
+    scale_id?: number | null;
+    value_ids: number[];
+    values: string[];
+  }[];
+  offerings: { price: Money; quantity: number; is_enabled: boolean }[];
+};
+
+/** Sets one price on every variation. Etsy keeps prices in the listing inventory. */
+export async function updatePrice(creds: EtsyCreds, listingId: number, price: number) {
+  const inv = await etsy<{
+    products: InventoryProduct[];
+    price_on_property?: number[];
+    quantity_on_property?: number[];
+    sku_on_property?: number[];
+  }>(creds, `/application/listings/${listingId}/inventory`);
+  const products = inv.products.map((p) => ({
+    sku: p.sku ?? "",
+    property_values: p.property_values.map((v) => ({
+      property_id: v.property_id,
+      property_name: v.property_name,
+      scale_id: v.scale_id ?? null,
+      value_ids: v.value_ids,
+      values: v.values,
+    })),
+    offerings: p.offerings.map((o) => ({
+      price: Math.round(price * 100) / 100,
+      quantity: o.quantity,
+      is_enabled: o.is_enabled,
+    })),
+  }));
+  return etsy(creds, `/application/listings/${listingId}/inventory`, {
+    method: "PUT",
+    json: {
+      products,
+      price_on_property: inv.price_on_property ?? [],
+      quantity_on_property: inv.quantity_on_property ?? [],
+      sku_on_property: inv.sku_on_property ?? [],
+    },
   });
 }
 

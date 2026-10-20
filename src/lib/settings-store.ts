@@ -35,8 +35,15 @@ export type Settings = {
   /** Draft prices in USD. */
   etsyPriceDigital: number;
   etsyPricePattern: number;
-  /** Make the next queued daily product by itself when the app opens (skips the cost prompt). */
+  /** Lowest price the price advice may suggest. */
+  etsyMinPrice: number;
+  /** Make the queued daily products by themselves when the app opens (skips the cost prompt). */
   dailyAuto: boolean;
+  /** Drafts to make each day, 1-5. */
+  dailyCount: number;
+  /** When the queue runs low, add the best demand-checked ideas of this kind by itself. */
+  dailyAutoIdeas: boolean;
+  dailyIdeasKind: string;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -56,7 +63,11 @@ export const DEFAULT_SETTINGS: Settings = {
   etsyShopName: "",
   etsyPriceDigital: 2.99,
   etsyPricePattern: 4.99,
+  etsyMinPrice: 1.99,
   dailyAuto: false,
+  dailyCount: 1,
+  dailyAutoIdeas: false,
+  dailyIdeasKind: "crochet",
 };
 
 const isProvider = (v: unknown): v is AIProvider => v === "gemini" || v === "openrouter";
@@ -82,7 +93,11 @@ function clean(raw: Partial<Record<keyof Settings, unknown>>): Settings {
     etsyShopName: str(raw.etsyShopName),
     etsyPriceDigital: num(raw.etsyPriceDigital, DEFAULT_SETTINGS.etsyPriceDigital),
     etsyPricePattern: num(raw.etsyPricePattern, DEFAULT_SETTINGS.etsyPricePattern),
+    etsyMinPrice: num(raw.etsyMinPrice, DEFAULT_SETTINGS.etsyMinPrice),
     dailyAuto: raw.dailyAuto === true,
+    dailyCount: Math.min(5, Math.max(1, Math.round(num(raw.dailyCount, 1)))),
+    dailyAutoIdeas: raw.dailyAutoIdeas === true,
+    dailyIdeasKind: str(raw.dailyIdeasKind) || "crochet",
   };
 }
 

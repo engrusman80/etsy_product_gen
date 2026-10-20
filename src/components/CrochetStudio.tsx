@@ -46,6 +46,8 @@ type Props = {
   shop?: Record<string, string>;
   /** Today's queued crochet idea from the Etsy page. */
   daily?: DailyItem | null;
+  /** Called when the queued idea is finished, saved or not. */
+  onDailyDone?: () => void;
 };
 
 const HISTORY_KEY = "crochet:history";
@@ -153,7 +155,7 @@ function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 }
 
-export function CrochetStudio({ apiCall, shopName, shop, daily }: Props) {
+export function CrochetStudio({ apiCall, shopName, shop, daily, onDailyDone }: Props) {
   const [settings] = useSettings();
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftUrl, setDraftUrl] = useState<string | null>(null);
@@ -383,16 +385,16 @@ export function CrochetStudio({ apiCall, shopName, shop, daily }: Props) {
   }
 
   // Today's queued crochet idea from the Etsy page.
-  const dailyStarted = useRef(false);
+  const dailyStarted = useRef<string | null>(null);
   useEffect(() => {
-    if (!daily || dailyStarted.current) return;
-    dailyStarted.current = true;
+    if (!daily || dailyStarted.current === daily.id) return;
+    dailyStarted.current = daily.id;
     setIdea(daily.idea);
     void (async () => {
-      toast.info(`Making today's Etsy draft: ${daily.idea}`);
       const r = await generate(daily.idea);
       if (!r) {
         markDaily(daily.id, { error: "pattern generation failed" });
+        onDailyDone?.();
         return;
       }
       try {
@@ -404,6 +406,7 @@ export function CrochetStudio({ apiCall, shopName, shop, daily }: Props) {
         markDaily(daily.id, { error: (e as Error).message.slice(0, 160) });
         toast.error((e as Error).message);
       }
+      onDailyDone?.();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daily]);

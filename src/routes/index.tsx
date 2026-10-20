@@ -66,7 +66,8 @@ import {
   ETSY_FILE_MAX,
   TAXONOMY_WORDS,
   blobToB64,
-  dueDailyItem,
+  addToQueue,
+  dueDailyItems,
   etsyCall,
   etsyConnected,
   loadQueue,
@@ -79,6 +80,7 @@ import {
   type DraftResult,
 } from "@/lib/etsy/client";
 import { checkShop, type ListingLike } from "@/lib/etsy/check";
+import { findDemandIdeas } from "@/lib/etsy/growth";
 import {
   DEFAULT_PRODUCT_TYPE,
   PRODUCT_TYPES,
@@ -1273,7 +1275,8 @@ function Index() {
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftResult, setDraftResult] = useState<DraftResult | null>(null);
   const [crochetDaily, setCrochetDaily] = useState<DailyItem | null>(null);
-  const [dueDaily, setDueDaily] = useState<DailyItem | null>(null);
+  const [dueDaily, setDueDaily] = useState<DailyItem[]>([]);
+  const crochetDoneRef = useRef<(() => void) | null>(null);
 
   /** Saves one product to Etsy as an inactive draft. Never publishes. */
   async function saveProductDraft(item: ProductItem, useEdits: boolean): Promise<DraftResult> {
@@ -1351,45 +1354,73 @@ function Index() {
         })
         .catch((e: Error) => console.warn("shop check failed", e.message));
 
-    const picked = search.daily
-      ? (loadQueue().find((i) => i.id === search.daily && !i.doneAt) ?? null)
-      : dueDailyItem();
-    if (!picked) return;
-    if (!search.daily && !settings.dailyAuto) {
-      setDueDaily(picked);
-      return;
-    }
-    void runDaily(picked, !search.daily);
+    void (async () => {
+      if (search.daily) {
+        const one = loadQueue().find((i) => i.id === search.daily && !i.doneAt);
+        if (one) await runDaily([one], false);
+        return;
+      }
+      // Keep the queue topped up with demand-checked ideas when the user asked for that.
+      const pending = loadQueue().filter((i) => !i.doneAt).length;
+      if (settings.dailyAutoIdeas && pending < settings.dailyCount) {
+        try {
+          const ideas = await findDemandIdeas(settings.dailyIdeasKind, 8);
+          const added = addToQueue(
+            ideas.slice(0, settings.dailyCount - pending + 1).map((i) => ({
+              idea: i.idea,
+              kind: i.kind,
+              competition: i.competition,
+              favorites: i.favorites,
+            })),
+          );
+          if (added.length)
+            toast.info(`Added ${added.length} demand-checked idea(s) to your daily list.`);
+        } catch (e) {
+          console.warn("idea search failed", (e as Error).message);
+        }
+      }
+      const due = dueDailyItems(settings.dailyCount);
+      if (!due.length) return;
+      if (!settings.dailyAuto) setDueDaily(due);
+      else await runDaily(due, true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.etsyShopId, search.daily]);
 
-  async function runDaily(item: DailyItem, auto: boolean) {
-    setDueDaily(null);
-    if (item.kind === "crochet") {
-      setActiveTab("crochet");
-      setCrochetDaily(item);
-      return;
-    }
-    const type = getProductType(item.kind).id;
-    setActiveTab("product");
-    setTypePref({ id: type });
-    setIdea(item.idea);
-    toast.info(`Making today's Etsy draft: ${item.idea}`);
-    skipCostRef.current = auto;
-    const result = await generate({ idea: item.idea, type });
-    skipCostRef.current = false;
-    if (!result) {
-      markDaily(item.id, { error: "generation failed or was cancelled" });
-      return;
-    }
-    try {
-      const d = await saveProductDraft(result, false);
-      setDraftResult(d);
-      markDaily(item.id, { doneAt: todayKey(), listingId: d.listingId, editUrl: d.editUrl });
-      toast.success("Today's draft is saved on Etsy.");
-    } catch (e) {
-      markDaily(item.id, { error: (e as Error).message.slice(0, 160) });
-      toast.error((e as Error).message);
+  /** Makes each queued idea and saves it to Etsy as a draft, one after another. */
+  async function runDaily(items: DailyItem[], auto: boolean) {
+    setDueDaily([]);
+    for (const [n, item] of items.entries()) {
+      const label = items.length > 1 ? ` (${n + 1}/${items.length})` : "";
+      toast.info(`Making today's Etsy draft${label}: ${item.idea}`);
+      if (item.kind === "crochet") {
+        setActiveTab("crochet");
+        await new Promise<void>((resolve) => {
+          crochetDoneRef.current = resolve;
+          setCrochetDaily(item);
+        });
+        continue;
+      }
+      const type = getProductType(item.kind).id;
+      setActiveTab("product");
+      setTypePref({ id: type });
+      setIdea(item.idea);
+      skipCostRef.current = auto;
+      const result = await generate({ idea: item.idea, type });
+      skipCostRef.current = false;
+      if (!result) {
+        markDaily(item.id, { error: "generation failed or was cancelled" });
+        continue;
+      }
+      try {
+        const d = await saveProductDraft(result, false);
+        setDraftResult(d);
+        markDaily(item.id, { doneAt: todayKey(), listingId: d.listingId, editUrl: d.editUrl });
+        toast.success(`Draft saved on Etsy: ${item.idea}`);
+      } catch (e) {
+        markDaily(item.id, { error: (e as Error).message.slice(0, 160) });
+        toast.error((e as Error).message);
+      }
     }
   }
 
@@ -2049,6 +2080,10 @@ function Index() {
                 <div className={activeTab !== "crochet" ? "hidden" : "block"}>
                   <CrochetStudio
                     daily={crochetDaily}
+                    onDailyDone={() => {
+                      crochetDoneRef.current?.();
+                      crochetDoneRef.current = null;
+                    }}
                     apiCall={api}
                     shopName={shop.shopName}
                     shop={shop as unknown as Record<string, string>}
@@ -2056,13 +2091,14 @@ function Index() {
                 </div>
 
                 <div className={activeTab !== "product" ? "hidden" : "block space-y-6"}>
-                  {dueDaily && !busy && (
+                  {dueDaily.length > 0 && !busy && (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-accent p-4 text-sm">
                       <span>
-                        Today&apos;s Etsy draft: <strong>{dueDaily.idea}</strong>
+                        Today&apos;s Etsy draft{dueDaily.length > 1 ? `s (${dueDaily.length})` : ""}
+                        : <strong>{dueDaily.map((d) => d.idea).join(" · ")}</strong>
                       </span>
                       <Button size="sm" onClick={() => void runDaily(dueDaily, false)}>
-                        Make today&apos;s draft
+                        Make today&apos;s draft{dueDaily.length > 1 ? "s" : ""}
                       </Button>
                     </div>
                   )}

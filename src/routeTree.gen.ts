@@ -26,6 +26,8 @@ import { Route as ApiEtsyRouteImport } from './routes/api/etsy'
 import { Route as ApiGenerateDesignRouteImport } from './routes/api/generate-design'
 import { Route as ApiGenerateMockupRouteImport } from './routes/api/generate-mockup'
 import { Route as ApiGenerateSeoRouteImport } from './routes/api/generate-seo'
+import { Route as ApiImproveListingRouteImport } from './routes/api/improve-listing'
+import { Route as ApiProductIdeasRouteImport } from './routes/api/product-ideas'
 import { Route as ApiRemoveBgRouteImport } from './routes/api/remove-bg'
 import { Route as EtsyIndexRouteImport } from './routes/etsy.index'
 import { Route as EtsyCallbackRouteImport } from './routes/etsy.callback'
@@ -117,6 +119,16 @@ const ApiGenerateSeoRoute = ApiGenerateSeoRouteImport.update({
   path: '/api/generate-seo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiImproveListingRoute = ApiImproveListingRouteImport.update({
+  id: '/api/improve-listing',
+  path: '/api/improve-listing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProductIdeasRoute = ApiProductIdeasRouteImport.update({
+  id: '/api/product-ideas',
+  path: '/api/product-ideas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRemoveBgRoute = ApiRemoveBgRouteImport.update({
   id: '/api/remove-bg',
   path: '/api/remove-bg',
@@ -156,6 +168,8 @@ export interface FileRoutesByFullPath {
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
+  '/api/improve-listing': typeof ApiImproveListingRoute
+  '/api/product-ideas': typeof ApiProductIdeasRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
   '/etsy/callback': typeof EtsyCallbackRoute
   '/etsy/': typeof EtsyIndexRoute
@@ -179,6 +193,8 @@ export interface FileRoutesByTo {
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
+  '/api/improve-listing': typeof ApiImproveListingRoute
+  '/api/product-ideas': typeof ApiProductIdeasRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
   '/etsy/callback': typeof EtsyCallbackRoute
   '/etsy': typeof EtsyIndexRoute
@@ -203,6 +219,8 @@ export interface FileRoutesById {
   '/api/generate-design': typeof ApiGenerateDesignRoute
   '/api/generate-mockup': typeof ApiGenerateMockupRoute
   '/api/generate-seo': typeof ApiGenerateSeoRoute
+  '/api/improve-listing': typeof ApiImproveListingRoute
+  '/api/product-ideas': typeof ApiProductIdeasRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
   '/etsy/callback': typeof EtsyCallbackRoute
   '/etsy/': typeof EtsyIndexRoute
@@ -228,6 +246,8 @@ export interface FileRouteTypes {
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
+    | '/api/improve-listing'
+    | '/api/product-ideas'
     | '/api/remove-bg'
     | '/etsy/callback'
     | '/etsy/'
@@ -251,6 +271,8 @@ export interface FileRouteTypes {
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
+    | '/api/improve-listing'
+    | '/api/product-ideas'
     | '/api/remove-bg'
     | '/etsy/callback'
     | '/etsy'
@@ -274,6 +296,8 @@ export interface FileRouteTypes {
     | '/api/generate-design'
     | '/api/generate-mockup'
     | '/api/generate-seo'
+    | '/api/improve-listing'
+    | '/api/product-ideas'
     | '/api/remove-bg'
     | '/etsy/callback'
     | '/etsy/'
@@ -298,6 +322,8 @@ export interface RootRouteChildren {
   ApiGenerateDesignRoute: typeof ApiGenerateDesignRoute
   ApiGenerateMockupRoute: typeof ApiGenerateMockupRoute
   ApiGenerateSeoRoute: typeof ApiGenerateSeoRoute
+  ApiImproveListingRoute: typeof ApiImproveListingRoute
+  ApiProductIdeasRoute: typeof ApiProductIdeasRoute
   ApiRemoveBgRoute: typeof ApiRemoveBgRoute
   EtsyCallbackRoute: typeof EtsyCallbackRoute
   EtsyIndexRoute: typeof EtsyIndexRoute
@@ -424,6 +450,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGenerateSeoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/improve-listing': {
+      id: '/api/improve-listing'
+      path: '/api/improve-listing'
+      fullPath: '/api/improve-listing'
+      preLoaderRoute: typeof ApiImproveListingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/product-ideas': {
+      id: '/api/product-ideas'
+      path: '/api/product-ideas'
+      fullPath: '/api/product-ideas'
+      preLoaderRoute: typeof ApiProductIdeasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/remove-bg': {
       id: '/api/remove-bg'
       path: '/api/remove-bg'
@@ -485,6 +525,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateDesignRoute: ApiGenerateDesignRoute,
   ApiGenerateMockupRoute: ApiGenerateMockupRoute,
   ApiGenerateSeoRoute: ApiGenerateSeoRoute,
+  ApiImproveListingRoute: ApiImproveListingRoute,
+  ApiProductIdeasRoute: ApiProductIdeasRoute,
   ApiRemoveBgRoute: ApiRemoveBgRoute,
   EtsyCallbackRoute: EtsyCallbackRoute,
   EtsyIndexRoute: EtsyIndexRoute,
