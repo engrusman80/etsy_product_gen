@@ -24,16 +24,15 @@ Quality: tack-sharp edges, crisp linework, smooth clean color fills, no noise, n
 Do not add borders, frames, mockup products, watermarks, signatures, or logos. Only include lettering if the request asks for specific text, and spell it exactly.
 Original artwork only: no trademarks, brands, or copyrighted characters.`;
 
-          // Design files are what the customer downloads, so request a hi-res native render.
-          // 2K keeps the base64 payload small enough for remove.bg and mockup edits; exports are
-          // then resampled to 4096px+ on the client.
+          // The design is the file the customer buys, so render it natively at 4K (4096px on
+          // Gemini 3 Pro Image). The client shrinks copies before sending them to remove.bg/mockups.
           const b64 = await callImage({
             provider,
             key,
             prompt: fullPrompt,
             aspectRatio: "1:1",
             hires: true,
-            imageSize: "2K",
+            imageSize: "4K",
           });
           return Response.json({ image: b64 });
         } catch (e) {

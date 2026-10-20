@@ -58,7 +58,15 @@ import { CostEstimateDialog } from "@/components/CostEstimateDialog";
 import { estimateRun, type Estimate, type EstimateInput } from "@/lib/cost-estimator";
 import { CrochetStudio } from "@/components/CrochetStudio";
 import { LandingPage } from "@/components/LandingPage";
-import { PRINT_DPI, removeWhiteBackground, traceVector, withDpi } from "@/lib/print-export";
+import { toast } from "sonner";
+import {
+  PRINT_DPI,
+  imageSize,
+  reencodeB64,
+  removeWhiteBackground,
+  traceVector,
+  withDpi,
+} from "@/lib/print-export";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -583,7 +591,11 @@ function Index() {
     setRegenBusy(true);
     setErr(null);
     try {
-      const body: Record<string, unknown> = { image: transparentImage, mockup: m.id, tweak };
+      const body: Record<string, unknown> = {
+        image: transparentImage ? await mockupInput(transparentImage) : transparentImage,
+        mockup: m.id,
+        tweak,
+      };
       if (m.id.startsWith("custom:")) body.customPrompt = m.label;
       const r = await api<{ image: string }>("/api/generate-mockup", body);
       setMockups((list) => list.map((x) => (x.id === m.id ? { ...x, image: r.image } : x)));
@@ -754,6 +766,34 @@ function Index() {
     throw lastError;
   }
 
+  /** Transparent cut-out of the design: remove.bg when a key works, else the local fallback. */
+  async function cutOut(design: string): Promise<string> {
+    try {
+      // remove.bg returns up to 25 MP; a high-quality JPEG keeps the 4K upload small.
+      const input = await reencodeB64(design, { type: "image/jpeg", quality: 0.95 });
+      const bgRes = await apiWithRetry<{ image: string }>("/api/remove-bg", { image: input }, 2);
+      return bgRes.image;
+    } catch (e) {
+      console.warn("remove.bg unavailable; cutting out the white background locally", e);
+      return removeWhiteBackground(design).catch(() => design);
+    }
+  }
+
+  /** Mockups only need a preview-sized copy of the 4K design as their input image. */
+  const mockupInput = (transparent: string) =>
+    reencodeB64(transparent, { maxSide: 1536 }).catch(() => transparent);
+
+  /** Warn (without failing) when the provider could not return a native 4K design. */
+  async function checkNative4k(design: string) {
+    const { width, height } = await imageSize(design).catch(() => ({ width: 0, height: 0 }));
+    if (width && Math.max(width, height) < 4096) {
+      toast.warning(
+        `Artwork came back at ${width}×${height}px, not native 4K. Files are upscaled to 4096px; for true 4K use Google Gemini, OpenRouter or Default AI (OpenAI tops out at 1536px).`,
+        { duration: 10000 },
+      );
+    }
+  }
+
   async function generateOneProduct(
     keyword: string,
     variationIndex: number,
@@ -782,26 +822,17 @@ function Index() {
       { prompt: variationPrompt },
       2,
     );
+    void checkNative4k(imgRes.image);
     onStage?.("Removing background…");
-    let transparent = imgRes.image;
-    try {
-      const bgRes = await apiWithRetry<{ image: string }>(
-        "/api/remove-bg",
-        { image: imgRes.image },
-        2,
-      );
-      transparent = bgRes.image;
-    } catch (e) {
-      console.warn("remove.bg unavailable; cutting out the white background locally", e);
-      transparent = await removeWhiteBackground(imgRes.image).catch(() => imgRes.image);
-    }
+    const transparent = await cutOut(imgRes.image);
+    const mockupSrc = await mockupInput(transparent);
     const toGen = allMockups.filter((m) => selectedMockups.has(m.id));
     const mockupsList: Mockup[] = [];
     for (let mi = 0; mi < toGen.length; mi++) {
       const m = toGen[mi];
       onStage?.(`Mockup ${mi + 1}/${toGen.length}: ${m.label}…`);
       try {
-        const body: Record<string, unknown> = { image: transparent, mockup: m.id };
+        const body: Record<string, unknown> = { image: mockupSrc, mockup: m.id };
         if (m.id.startsWith("custom:")) body.customPrompt = m.label;
         const r = await apiWithRetry<{ image: string }>("/api/generate-mockup", body, 2);
         mockupsList.push({ id: m.id, label: m.label, image: r.image });
@@ -860,21 +891,11 @@ function Index() {
           2,
         );
         setRawImage(imgRes.image);
+        void checkNative4k(imgRes.image);
         setProgress(35);
 
         setStep("Removing background…");
-        let transparent = imgRes.image;
-        try {
-          const bgRes = await apiWithRetry<{ image: string }>(
-            "/api/remove-bg",
-            { image: imgRes.image },
-            2,
-          );
-          transparent = bgRes.image;
-        } catch (e) {
-          console.warn("remove.bg unavailable; cutting out the white background locally", e);
-          transparent = await removeWhiteBackground(imgRes.image).catch(() => imgRes.image);
-        }
+        const transparent = await cutOut(imgRes.image);
         setTransparentImage(transparent);
         setProgress(50);
 
@@ -887,7 +908,10 @@ function Index() {
           for (let i = 0; i < toGen.length; i++) {
             const m = toGen[i];
             try {
-              const body: Record<string, unknown> = { image: transparent, mockup: m.id };
+              const body: Record<string, unknown> = {
+                image: await mockupInput(transparent),
+                mockup: m.id,
+              };
               if (m.id.startsWith("custom:")) body.customPrompt = m.label;
               const r = await apiWithRetry<{ image: string }>("/api/generate-mockup", body, 2);
               done.push({ id: m.id, label: m.label, image: r.image });

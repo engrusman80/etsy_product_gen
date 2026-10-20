@@ -355,3 +355,39 @@ function opaquePalette(
     a: 255,
   }));
 }
+
+/** Pixel size of a base64 image. */
+export async function imageSize(b64: string): Promise<{ width: number; height: number }> {
+  const img = await loadB64(b64);
+  return { width: img.naturalWidth, height: img.naturalHeight };
+}
+
+/**
+ * Re-encodes a base64 image, optionally downscaled so its longest side is <= maxSide.
+ * Used to keep 4K payloads small when they are only inputs (remove.bg, mockups).
+ */
+export async function reencodeB64(
+  b64: string,
+  opts: { maxSide?: number; type?: "image/png" | "image/jpeg"; quality?: number } = {},
+): Promise<string> {
+  const img = await loadB64(b64);
+  const scale = Math.min(
+    1,
+    (opts.maxSide ?? Infinity) / Math.max(img.naturalWidth, img.naturalHeight),
+  );
+  const w = Math.round(img.naturalWidth * scale);
+  const h = Math.round(img.naturalHeight * scale);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  const type = opts.type ?? "image/png";
+  if (type === "image/jpeg") {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.drawImage(img, 0, 0, w, h);
+  return c.toDataURL(type, opts.quality ?? 0.95).split(",")[1];
+}
