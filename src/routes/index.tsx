@@ -58,7 +58,7 @@ import { CostEstimateDialog } from "@/components/CostEstimateDialog";
 import { estimateRun, type Estimate, type EstimateInput } from "@/lib/cost-estimator";
 import { CrochetStudio } from "@/components/CrochetStudio";
 import { LandingPage } from "@/components/LandingPage";
-import { PRINT_DPI, removeWhiteBackground, withDpi } from "@/lib/print-export";
+import { PRINT_DPI, removeWhiteBackground, traceVector, withDpi } from "@/lib/print-export";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -399,13 +399,6 @@ showpage
 %%EOF
 `;
   return new Blob([eps], { type: "application/postscript" });
-}
-
-function makeDxf(b64: string, size: number): Blob {
-  const chunks = b64.match(/.{1,250}/g) ?? [b64];
-  const comments = chunks.map((c) => `999\n${c}`).join("\n");
-  const dxf = `999\nEtsyForge raster design — PNG embedded as base64 below\n${comments}\n0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\n0\n90\n4\n70\n1\n10\n0\n20\n0\n10\n${size}\n20\n0\n10\n${size}\n20\n${size}\n10\n0\n20\n${size}\n0\nENDSEC\n0\nEOF\n`;
-  return new Blob([dxf], { type: "application/dxf" });
 }
 
 async function makeShowcaseVideo(b64: string, onProgress?: (p: number) => void): Promise<Blob> {
@@ -982,12 +975,20 @@ function Index() {
           dir.file(`design-${r.label}-white-bg.jpg`, await resizePng(pTrans, r.size, "#ffffff"));
         }
       }
-      dir.file("design.svg", makeSvg(pTrans, DEFAULT_EXPORT_SIZE));
+      // Real vector cut files (SVG + DXF) for Cricut/Silhouette; fall back to an SVG that
+      // wraps the PNG if tracing fails.
+      try {
+        const vec = await traceVector(pTrans, DEFAULT_EXPORT_SIZE);
+        dir.file("design.svg", vec.svg);
+        dir.file("design.dxf", vec.dxf);
+      } catch (e) {
+        console.warn("vector trace failed; exporting raster SVG", e);
+        dir.file("design.svg", makeSvg(pTrans, DEFAULT_EXPORT_SIZE));
+      }
       const pdfBlob = await makePdf(pTrans, DEFAULT_EXPORT_SIZE);
       dir.file("design.pdf", pdfBlob);
       dir.file("design.ai", pdfBlob);
       dir.file("design.eps", await makeEps(pTrans, DEFAULT_EXPORT_SIZE));
-      dir.file("design.dxf", makeDxf(pTrans, DEFAULT_EXPORT_SIZE));
     }
     if (rawEdits.include) {
       if (rawEdited) {

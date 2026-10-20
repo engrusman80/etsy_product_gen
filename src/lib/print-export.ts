@@ -199,3 +199,159 @@ export async function withDpi(blob: Blob, dpi = PRINT_DPI): Promise<Blob> {
   const out = blob.type === "image/png" ? pngWithDpi(buf, dpi) : jpegWithDpi(buf, dpi);
   return new Blob([out as Uint8Array<ArrayBuffer>], { type: blob.type });
 }
+
+// ---- Vector tracing (SVG / DXF cut files) ---------------------------------
+
+type TraceSegment = {
+  type: "L" | "Q";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  x3?: number;
+  y3?: number;
+};
+type TracePath = { segments: TraceSegment[]; isholepath: boolean; holechildren: number[] };
+type TraceData = {
+  layers: TracePath[][];
+  palette: { r: number; g: number; b: number; a: number }[];
+  width: number;
+  height: number;
+};
+
+/**
+ * Traces the (transparent) design into real vector shapes for Cricut/Silhouette users.
+ * The raster is downscaled first: tracing is CPU-bound and runs on the main thread.
+ * Returns an SVG sized in inches at PRINT_DPI and a DXF of the same outlines.
+ */
+export async function traceVector(
+  b64: string,
+  printPx: number,
+  opts: { maxSide?: number; colors?: number } = {},
+): Promise<{ svg: Blob; dxf: Blob }> {
+  const { default: ImageTracer } = await import("imagetracerjs");
+  const img = await loadB64(b64);
+  const maxSide = opts.maxSide ?? 768;
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * scale);
+  const h = Math.round(img.naturalHeight * scale);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, w, h);
+  const imgd = ctx.getImageData(0, 0, w, h);
+  // Cut files need hard edges: binarize alpha, and give every transparent pixel the same
+  // colour so it maps onto the palette's transparent entry instead of a real colour.
+  const d = imgd.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 128) d[i] = d[i + 1] = d[i + 2] = d[i + 3] = 0;
+    else d[i + 3] = 255;
+  }
+
+  const traceOpts = {
+    pal: [{ r: 0, g: 0, b: 0, a: 0 }, ...opaquePalette(d, (opts.colors ?? 16) - 1)],
+    colorquantcycles: 2,
+    pathomit: 8,
+    ltres: 1,
+    qtres: 1,
+    blurradius: 0,
+    strokewidth: 0,
+    linefilter: true,
+    roundcoords: 2,
+    viewbox: true,
+    scale: 1,
+  };
+  const td = ImageTracer.imagedataToTracedata(imgd, traceOpts) as TraceData;
+  // Drop transparent colour layers so the background is not traced as a shape.
+  td.layers = td.layers.map((layer, i) => (td.palette[i].a < 128 ? [] : layer));
+
+  const inchesW = ((printPx / Math.max(w, h)) * w) / PRINT_DPI;
+  const inchesH = ((printPx / Math.max(w, h)) * h) / PRINT_DPI;
+  const svgStr = (ImageTracer.getsvgstring(td, traceOpts) as string).replace(
+    /^<svg /,
+    `<svg width="${inchesW.toFixed(3)}in" height="${inchesH.toFixed(3)}in" `,
+  );
+  const svg = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${svgStr}`], {
+    type: "image/svg+xml",
+  });
+
+  // DXF: one closed LWPOLYLINE per traced outline, in inches with the Y axis pointing up.
+  const k = inchesW / w;
+  const ents: string[] = [];
+  td.layers.forEach((layer) => {
+    for (const path of layer) {
+      const pts: [number, number][] = [];
+      for (const s of path.segments) {
+        if (!pts.length) pts.push([s.x1, s.y1]);
+        if (s.type === "Q" && s.x3 !== undefined && s.y3 !== undefined) {
+          for (let t = 0.25; t <= 1.0001; t += 0.25) {
+            const u = 1 - t;
+            pts.push([
+              u * u * s.x1 + 2 * u * t * s.x2 + t * t * s.x3,
+              u * u * s.y1 + 2 * u * t * s.y2 + t * t * s.y3!,
+            ]);
+          }
+        } else {
+          pts.push([s.x2, s.y2]);
+        }
+      }
+      if (pts.length < 3) continue;
+      const coords = pts
+        .map(([x, y]) => `10\n${(x * k).toFixed(4)}\n20\n${((h - y) * k).toFixed(4)}`)
+        .join("\n");
+      ents.push(`0\nLWPOLYLINE\n8\n0\n90\n${pts.length}\n70\n1\n${coords}`);
+    }
+  });
+  const dxfStr = `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n1\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents.join("\n")}\n0\nENDSEC\n0\nEOF\n`;
+  const dxf = new Blob([dxfStr], { type: "application/dxf" });
+  return { svg, dxf };
+}
+
+/** Small deterministic k-means over opaque pixels (farthest-point seeding, so dark details survive). */
+function opaquePalette(
+  d: Uint8ClampedArray,
+  k: number,
+): { r: number; g: number; b: number; a: number }[] {
+  const samples: number[][] = [];
+  const step = Math.max(1, Math.floor(d.length / 4 / 40000));
+  for (let p = 0; p < d.length / 4; p += step) {
+    const i = p * 4;
+    if (d[i + 3] === 255) samples.push([d[i], d[i + 1], d[i + 2]]);
+  }
+  if (!samples.length) return [{ r: 0, g: 0, b: 0, a: 255 }];
+  const dist = (x: number[], y: number[]) =>
+    Math.abs(x[0] - y[0]) + Math.abs(x[1] - y[1]) + Math.abs(x[2] - y[2]);
+  const centers: number[][] = [samples[0]];
+  const best = samples.map((s) => dist(s, centers[0]));
+  while (centers.length < Math.min(k, samples.length)) {
+    let far = 0;
+    for (let i = 1; i < samples.length; i++) if (best[i] > best[far]) far = i;
+    if (best[far] < 12) break; // remaining colours are near-duplicates
+    centers.push(samples[far]);
+    for (let i = 0; i < samples.length; i++)
+      best[i] = Math.min(best[i], dist(samples[i], samples[far]));
+  }
+  for (let iter = 0; iter < 6; iter++) {
+    const acc = centers.map(() => [0, 0, 0, 0]);
+    for (const s of samples) {
+      let ci = 0;
+      for (let c = 1; c < centers.length; c++)
+        if (dist(s, centers[c]) < dist(s, centers[ci])) ci = c;
+      acc[ci][0] += s[0];
+      acc[ci][1] += s[1];
+      acc[ci][2] += s[2];
+      acc[ci][3]++;
+    }
+    acc.forEach((a, c) => {
+      if (a[3]) centers[c] = [a[0] / a[3], a[1] / a[3], a[2] / a[3]];
+    });
+  }
+  return centers.map(([r, g, b]) => ({
+    r: Math.round(r),
+    g: Math.round(g),
+    b: Math.round(b),
+    a: 255,
+  }));
+}
