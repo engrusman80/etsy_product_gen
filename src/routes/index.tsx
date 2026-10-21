@@ -162,6 +162,7 @@ const TEXT_ROUTES = new Set([
   "/api/crochet-suggest",
   "/api/product-ideas",
   "/api/improve-listing",
+  "/api/trend-keywords",
 ]);
 
 const DEFAULT_EXPORT_SIZE = 4096;

@@ -60,11 +60,13 @@ export type TextOpts = {
   tier?: "fast" | "pro";
   /** Max output tokens (default 8192 to avoid truncated JSON). */
   maxTokens?: number;
+  /** Let the model search the web first (Claude web search, Google Search, OpenRouter :online). */
+  webSearch?: boolean;
 };
 
 /** Returns the assistant text content (or JSON string if json=true). Retries transient 429/500/503/524. */
 export async function callText(opts: TextOpts): Promise<string> {
-  const { provider, key, system, user, json, tier = "fast", maxTokens = 8192 } = opts;
+  const { provider, key, system, user, json, tier = "fast", maxTokens = 8192, webSearch } = opts;
 
   const delays = [1500, 4000, 9000];
   let lastErr: Error | null = null;
@@ -72,15 +74,17 @@ export async function callText(opts: TextOpts): Promise<string> {
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       if (provider === "anthropic")
-        return await claudeText({ key, system, user, json, tier, maxTokens });
+        return await claudeText({ key, system, user, json, tier, maxTokens, webSearch });
 
       if (provider === "gemini") {
         const generationConfig: Record<string, unknown> = { maxOutputTokens: maxTokens };
-        if (json) generationConfig.responseMimeType = "application/json";
+        // Google Search grounding does not combine with the JSON response type.
+        if (json && !webSearch) generationConfig.responseMimeType = "application/json";
         const body: Record<string, unknown> = {
           contents: [{ role: "user", parts: [{ text: user }] }],
           generationConfig,
         };
+        if (webSearch) body.tools = [{ google_search: {} }];
         if (system) body.systemInstruction = { parts: [{ text: system }] };
         const send = (model: string) =>
           fetch(
@@ -133,11 +137,11 @@ export async function callText(opts: TextOpts): Promise<string> {
         };
         const text = j.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ?? "";
         if (!text) throw new Error("Gemini returned empty response");
-        return text;
+        return json && webSearch ? jsonPart(text) : text;
       }
 
       const cfg = openAiCompatConfig(provider);
-      const model =
+      const baseModel =
         provider === "openai"
           ? "gpt-4o-mini"
           : provider === "openrouter"
@@ -145,6 +149,8 @@ export async function callText(opts: TextOpts): Promise<string> {
             : provider === "xai"
               ? "grok-2-1212"
               : "google/gemini-2.5-flash";
+      // OpenRouter adds web results to any model with the ":online" suffix.
+      const model = webSearch && provider === "openrouter" ? `${baseModel}:online` : baseModel;
       const messages: { role: string; content: string }[] = [];
       if (system) messages.push({ role: "system", content: system });
       messages.push({ role: "user", content: user });
@@ -163,7 +169,7 @@ export async function callText(opts: TextOpts): Promise<string> {
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const content = j.choices?.[0]?.message?.content ?? "";
       if (!content) throw new Error(`${provider} returned empty content`);
-      return content;
+      return json && webSearch ? jsonPart(content) : content;
     } catch (e) {
       lastErr = e as Error;
       const status = (e as Error & { status?: number }).status;
@@ -191,29 +197,39 @@ async function claudeText(o: {
   json?: boolean;
   tier: "fast" | "pro";
   maxTokens: number;
+  webSearch?: boolean;
 }): Promise<string> {
   // The SDK already retries rate limits and overloads with backoff, so callText must not repeat it.
   const client = new Anthropic({ apiKey: o.key, maxRetries: 3 });
   const system = o.json
     ? `${o.system ?? ""}\n\nReply with only the JSON object: no code fences and no other text.`.trim()
     : o.system;
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: o.user }];
   let msg: Anthropic.Beta.BetaMessage;
   try {
-    // Streamed so long patterns never hit the request timeout.
-    msg = await client.beta.messages
-      .stream({
-        model: CLAUDE_MODEL,
-        // Claude always thinks first and that counts toward max_tokens, so leave room for it.
-        max_tokens: o.maxTokens + (o.tier === "pro" ? 24000 : 8000),
-        // "high" where every stitch count must add up, Opus 5.5's own default elsewhere.
-        output_config: { effort: o.tier === "pro" ? "high" : "medium" },
-        ...(system ? { system } : {}),
-        messages: [{ role: "user", content: o.user }],
-        // If a safety check wrongly declines, Anthropic re-runs the request on its recommended model.
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-      })
-      .finalMessage();
+    // A long web search can pause the turn; sending it back as is lets the server carry on.
+    for (let turn = 0; ; turn++) {
+      // Streamed so long patterns never hit the request timeout.
+      msg = await client.beta.messages
+        .stream({
+          model: CLAUDE_MODEL,
+          // Claude always thinks first and that counts toward max_tokens, so leave room for it.
+          max_tokens: o.maxTokens + (o.tier === "pro" ? 24000 : 8000),
+          // "high" where every stitch count must add up, Opus 5.5's own default elsewhere.
+          output_config: { effort: o.tier === "pro" ? "high" : "medium" },
+          ...(system ? { system } : {}),
+          messages,
+          ...(o.webSearch
+            ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }] }
+            : {}),
+          // If a safety check wrongly declines, Anthropic re-runs the request on its recommended model.
+          betas: ["server-side-fallback-2026-07-01"],
+          fallbacks: "default",
+        })
+        .finalMessage();
+      if (msg.stop_reason !== "pause_turn" || turn >= 3) break;
+      messages.push({ role: "assistant", content: msg.content });
+    }
   } catch (e) {
     throw claudeError(e);
   }

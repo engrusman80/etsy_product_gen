@@ -35,6 +35,7 @@ import {
   type DailyItem,
 } from "@/lib/etsy/client";
 import { CURATED_CROCHET_IDEAS, pickIdeas } from "@/lib/crochet/curated";
+import { TrendKeywords } from "@/components/TrendKeywords";
 import { buildCrochetPdf, patternHash } from "@/lib/crochet/pdf";
 import type { CrochetPattern } from "@/lib/crochet/types";
 
@@ -580,6 +581,14 @@ export function CrochetStudio({ apiCall, shopName, shop, daily, onDailyDone }: P
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <TrendKeywords
+          busy={busy}
+          onUse={(k) => {
+            setIdea(k);
+            document.getElementById("crochet-idea")?.scrollIntoView({ block: "center" });
+          }}
+        />
+
         {/* Suggestions */}
         <div>
           <div className="mb-2 flex items-center justify-between">

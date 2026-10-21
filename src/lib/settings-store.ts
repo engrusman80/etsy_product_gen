@@ -56,6 +56,8 @@ export type Settings = {
   /** When the queue runs low, add the best demand-checked ideas of this kind by itself. */
   dailyAutoIdeas: boolean;
   dailyIdeasKind: string;
+  /** Look for new trending crochet keywords once a day when the crochet page opens. */
+  dailyKeywords: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -82,6 +84,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dailyCount: 1,
   dailyAutoIdeas: false,
   dailyIdeasKind: "crochet",
+  dailyKeywords: true,
 };
 
 const isProvider = (v: unknown): v is AIProvider => v === "gemini" || v === "openrouter";
@@ -114,6 +117,7 @@ function clean(raw: Partial<Record<keyof Settings, unknown>>): Settings {
     dailyCount: Math.min(5, Math.max(1, Math.round(num(raw.dailyCount, 1)))),
     dailyAutoIdeas: raw.dailyAutoIdeas === true,
     dailyIdeasKind: str(raw.dailyIdeasKind) || "crochet",
+    dailyKeywords: raw.dailyKeywords !== false,
   };
 }
 

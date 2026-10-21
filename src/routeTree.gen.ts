@@ -29,6 +29,7 @@ import { Route as ApiGenerateSeoRouteImport } from './routes/api/generate-seo'
 import { Route as ApiImproveListingRouteImport } from './routes/api/improve-listing'
 import { Route as ApiProductIdeasRouteImport } from './routes/api/product-ideas'
 import { Route as ApiRemoveBgRouteImport } from './routes/api/remove-bg'
+import { Route as ApiTrendKeywordsRouteImport } from './routes/api/trend-keywords'
 import { Route as EtsyIndexRouteImport } from './routes/etsy.index'
 import { Route as EtsyCallbackRouteImport } from './routes/etsy.callback'
 import { Route as ApiEtsyCallbackRouteImport } from './routes/api/etsy.callback'
@@ -134,6 +135,11 @@ const ApiRemoveBgRoute = ApiRemoveBgRouteImport.update({
   path: '/api/remove-bg',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTrendKeywordsRoute = ApiTrendKeywordsRouteImport.update({
+  id: '/api/trend-keywords',
+  path: '/api/trend-keywords',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EtsyIndexRoute = EtsyIndexRouteImport.update({
   id: '/etsy/',
   path: '/etsy/',
@@ -171,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/api/improve-listing': typeof ApiImproveListingRoute
   '/api/product-ideas': typeof ApiProductIdeasRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
+  '/api/trend-keywords': typeof ApiTrendKeywordsRoute
   '/etsy/callback': typeof EtsyCallbackRoute
   '/etsy/': typeof EtsyIndexRoute
   '/api/etsy/callback': typeof ApiEtsyCallbackRoute
@@ -196,6 +203,7 @@ export interface FileRoutesByTo {
   '/api/improve-listing': typeof ApiImproveListingRoute
   '/api/product-ideas': typeof ApiProductIdeasRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
+  '/api/trend-keywords': typeof ApiTrendKeywordsRoute
   '/etsy/callback': typeof EtsyCallbackRoute
   '/etsy': typeof EtsyIndexRoute
   '/api/etsy/callback': typeof ApiEtsyCallbackRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/api/improve-listing': typeof ApiImproveListingRoute
   '/api/product-ideas': typeof ApiProductIdeasRoute
   '/api/remove-bg': typeof ApiRemoveBgRoute
+  '/api/trend-keywords': typeof ApiTrendKeywordsRoute
   '/etsy/callback': typeof EtsyCallbackRoute
   '/etsy/': typeof EtsyIndexRoute
   '/api/etsy/callback': typeof ApiEtsyCallbackRoute
@@ -249,6 +258,7 @@ export interface FileRouteTypes {
     | '/api/improve-listing'
     | '/api/product-ideas'
     | '/api/remove-bg'
+    | '/api/trend-keywords'
     | '/etsy/callback'
     | '/etsy/'
     | '/api/etsy/callback'
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
     | '/api/improve-listing'
     | '/api/product-ideas'
     | '/api/remove-bg'
+    | '/api/trend-keywords'
     | '/etsy/callback'
     | '/etsy'
     | '/api/etsy/callback'
@@ -299,6 +310,7 @@ export interface FileRouteTypes {
     | '/api/improve-listing'
     | '/api/product-ideas'
     | '/api/remove-bg'
+    | '/api/trend-keywords'
     | '/etsy/callback'
     | '/etsy/'
     | '/api/etsy/callback'
@@ -325,6 +337,7 @@ export interface RootRouteChildren {
   ApiImproveListingRoute: typeof ApiImproveListingRoute
   ApiProductIdeasRoute: typeof ApiProductIdeasRoute
   ApiRemoveBgRoute: typeof ApiRemoveBgRoute
+  ApiTrendKeywordsRoute: typeof ApiTrendKeywordsRoute
   EtsyCallbackRoute: typeof EtsyCallbackRoute
   EtsyIndexRoute: typeof EtsyIndexRoute
 }
@@ -471,6 +484,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRemoveBgRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/trend-keywords': {
+      id: '/api/trend-keywords'
+      path: '/api/trend-keywords'
+      fullPath: '/api/trend-keywords'
+      preLoaderRoute: typeof ApiTrendKeywordsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/etsy/': {
       id: '/etsy/'
       path: '/etsy'
@@ -528,6 +548,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiImproveListingRoute: ApiImproveListingRoute,
   ApiProductIdeasRoute: ApiProductIdeasRoute,
   ApiRemoveBgRoute: ApiRemoveBgRoute,
+  ApiTrendKeywordsRoute: ApiTrendKeywordsRoute,
   EtsyCallbackRoute: EtsyCallbackRoute,
   EtsyIndexRoute: EtsyIndexRoute,
 }
