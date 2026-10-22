@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, Eye, EyeOff, KeyRound, Loader2, ShieldCheck, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { renderSVG } from "uqr";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -488,6 +489,7 @@ function PhoneConnect({ settings }: { settings: Settings }) {
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const qr = useMemo(() => (link ? renderSVG(link, { ecc: "L", border: 2 }) : ""), [link]);
 
   async function makeLink() {
     setErr(null);
@@ -552,10 +554,19 @@ function PhoneConnect({ settings }: { settings: Settings }) {
               </Button>
             </div>
           )}
+          {qr && (
+            <div
+              className="mt-2 h-56 w-56 rounded-md bg-white p-1 [&>svg]:h-full [&>svg]:w-full"
+              role="img"
+              aria-label="QR code of the Etsy link"
+              dangerouslySetInnerHTML={{ __html: qr }}
+            />
+          )}
         </li>
         <li>
-          Send the link to your phone (for example in WhatsApp to yourself) and open it in the
-          phone's browser. Sign in to Etsy there and press <b>Allow access</b>.
+          Scan the code with your phone's camera, or send the link to your phone (for example in
+          WhatsApp to yourself), and open it in the phone's browser. Sign in to Etsy there and press{" "}
+          <b>Allow access</b>.
         </li>
         <li>
           The phone then shows a page that cannot open. That is expected: the address points to this
