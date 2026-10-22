@@ -19,8 +19,13 @@ import {
   type Settings,
   type TextProvider,
 } from "@/lib/settings-store";
-import { Moon, Store, Sun } from "lucide-react";
-import { etsyConnected, startEtsyConnect } from "@/lib/etsy/client";
+import { Copy, Moon, Smartphone, Store, Sun } from "lucide-react";
+import {
+  etsyConnectLink,
+  etsyConnected,
+  finishEtsyConnectFromAddress,
+  startEtsyConnect,
+} from "@/lib/etsy/client";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings · Digital Product AI Automation" }] }),
@@ -471,6 +476,106 @@ function EtsyConnect({
           </>
         )}
       </div>
+      {ready && <PhoneConnect settings={settings} />}
+    </div>
+  );
+}
+
+/** For computers where etsy.com shows "Access is temporarily restricted": approve on a phone. */
+function PhoneConnect({ settings }: { settings: Settings }) {
+  const [open, setOpen] = useState(false);
+  const [link, setLink] = useState("");
+  const [address, setAddress] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function makeLink() {
+    setErr(null);
+    setAddress("");
+    setLink(await etsyConnectLink(settings));
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Link copied. Send it to your phone.");
+    } catch {
+      toast.error("Could not copy. Select the link and copy it yourself.");
+    }
+  }
+
+  async function finish() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const s = await finishEtsyConnectFromAddress(address);
+      toast.success(`Connected to ${s.etsyShopName}`);
+      setOpen(false);
+      setLink("");
+      setAddress("");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open)
+    return (
+      <button type="button" className="text-xs underline" onClick={() => setOpen(true)}>
+        Etsy says "Access is temporarily restricted" on this computer? Connect with your phone
+        instead.
+      </button>
+    );
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <p className="flex items-center gap-2 font-medium">
+        <Smartphone className="h-4 w-4" /> Connect with your phone
+      </p>
+      <ol className="list-decimal space-y-2 pl-5 text-muted-foreground">
+        <li>
+          <Button size="sm" variant="outline" onClick={makeLink}>
+            {link ? "Make a new link" : "Make the phone link"}
+          </Button>
+          {link && (
+            <div className="mt-2 flex gap-2">
+              <Input
+                readOnly
+                value={link}
+                onFocus={(e) => e.target.select()}
+                className="font-mono text-xs"
+                aria-label="Etsy link for your phone"
+              />
+              <Button size="sm" variant="outline" onClick={copy}>
+                <Copy className="h-3.5 w-3.5" /> Copy
+              </Button>
+            </div>
+          )}
+        </li>
+        <li>
+          Send the link to your phone (for example in WhatsApp to yourself) and open it in the
+          phone's browser. Sign in to Etsy there and press <b>Allow access</b>.
+        </li>
+        <li>
+          The phone then shows a page that cannot open. That is expected: the address points to this
+          computer. Copy the whole address from the phone's address bar, send it back to this
+          computer and paste it here within a few minutes.
+        </li>
+      </ol>
+      <div className="flex gap-2">
+        <Input
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="http://localhost:8080/etsy/callback?code=…"
+          className="font-mono text-xs"
+          aria-label="Address from your phone"
+        />
+        <Button size="sm" onClick={finish} disabled={!address.trim() || busy}>
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Finish connecting
+        </Button>
+      </div>
+      {err && <p className="text-xs text-destructive">{err}</p>}
     </div>
   );
 }

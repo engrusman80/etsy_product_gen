@@ -16,24 +16,34 @@ function b64url(bytes: Uint8Array) {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Sends the user to Etsy to approve access; Etsy returns to /etsy/callback. */
-export async function startEtsyConnect(s: Settings) {
+type PendingConnect = { verifier: string; state: string; redirectUri: string };
+
+/** Builds the Etsy approval link and remembers the PKCE values for the way back. */
+export async function etsyConnectLink(s: Settings): Promise<string> {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const challenge = b64url(
     new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))),
   );
-  sessionStorage.setItem(VERIFIER_KEY, JSON.stringify({ verifier, state }));
+  const redirectUri = etsyRedirectUri(s.etsyCallbackApi);
+  // localStorage, not sessionStorage: a phone sign-in can take a while and the page may reload.
+  const pending: PendingConnect = { verifier, state, redirectUri };
+  localStorage.setItem(VERIFIER_KEY, JSON.stringify(pending));
   const q = new URLSearchParams({
     response_type: "code",
-    redirect_uri: etsyRedirectUri(s.etsyCallbackApi),
+    redirect_uri: redirectUri,
     scope: SCOPES,
     client_id: s.etsyKeystring,
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
-  window.location.href = `https://www.etsy.com/oauth/connect?${q}`;
+  return `https://www.etsy.com/oauth/connect?${q}`;
+}
+
+/** Sends the user to Etsy to approve access; Etsy returns to /etsy/callback. */
+export async function startEtsyConnect(s: Settings) {
+  window.location.href = await etsyConnectLink(s);
 }
 
 async function post<T>(s: Settings, body: unknown, token?: string): Promise<T> {
@@ -69,19 +79,19 @@ export async function finishEtsyConnect(
   state: string,
   viaApi: boolean,
 ): Promise<Settings> {
-  const saved = JSON.parse(sessionStorage.getItem(VERIFIER_KEY) || "{}") as {
-    verifier?: string;
-    state?: string;
-  };
-  sessionStorage.removeItem(VERIFIER_KEY);
+  const saved = JSON.parse(
+    localStorage.getItem(VERIFIER_KEY) || sessionStorage.getItem(VERIFIER_KEY) || "{}",
+  ) as Partial<PendingConnect>;
   if (!saved.verifier || saved.state !== state)
     throw new Error("This Etsy sign-in link expired. Press Connect Etsy again.");
+  localStorage.removeItem(VERIFIER_KEY);
+  sessionStorage.removeItem(VERIFIER_KEY);
   let s = loadSettings();
   const t = await post<Tokens>(s, {
     action: "token",
     code,
     verifier: saved.verifier,
-    redirectUri: etsyRedirectUri(viaApi),
+    redirectUri: saved.redirectUri || etsyRedirectUri(viaApi),
   });
   s = withTokens(s, t);
   const shop = await post<{ shopId: number; shopName: string }>(
@@ -92,6 +102,24 @@ export async function finishEtsyConnect(
   s = { ...s, etsyShopId: shop.shopId, etsyShopName: shop.shopName };
   saveSettings(s);
   return s;
+}
+
+/**
+ * Finishes a sign-in approved on another device: Etsy sends that device to this computer's
+ * localhost address, which it cannot open, so the user pastes that address here.
+ */
+export async function finishEtsyConnectFromAddress(address: string): Promise<Settings> {
+  const raw = address.trim();
+  const query = (raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : raw).split("#")[0];
+  const q = new URLSearchParams(query);
+  const code = q.get("code");
+  if (!code)
+    throw new Error(
+      q.get("error_description") ||
+        q.get("error") ||
+        "That address has no Etsy code. Copy the whole address from the phone after pressing Allow access.",
+    );
+  return finishEtsyConnect(code, q.get("state") || "", raw.includes("/api/etsy/callback"));
 }
 
 /** Calls /api/etsy with a fresh access token, refreshing and saving it when needed. */
